@@ -4,123 +4,50 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#050812">
-<title>VR Mobile — Hand Tracking</title>
+<meta name="theme-color" content="#000000">
+<title>VR Mobile</title>
 
 <style>
-:root {
-  --cyan: #00eaff;
-  --green: #55ff9b;
-  --orange: #ff9b45;
-  --panel: rgba(5, 12, 25, .88);
-}
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body {
-  margin: 0; width: 100%; height: 100%;
-  overflow: hidden; background: #03060b;
-  color: white; font-family: system-ui, -apple-system, sans-serif;
-  touch-action: none;
-}
-#game, #camera, #hud, #errorBox, #menu {
-  position: fixed; inset: 0;
-}
-#game { z-index: 2; pointer-events: none; }
-#camera {
-  z-index: 1; width: 100%; height: 100%;
-  object-fit: cover; transform: scaleX(1);
-  background: #03060b;
-}
-#hud { z-index: 5; pointer-events: none; }
-#topbar {
-  position: absolute; top: max(12px, env(safe-area-inset-top));
-  left: 12px; right: 12px;
-  display: flex; justify-content: space-between; align-items: flex-start;
-  gap: 8px;
-}
-.panel {
-  background: var(--panel); border: 1px solid #254257;
-  border-radius: 13px; padding: 10px 12px;
-  box-shadow: 0 0 18px #001b2a66;
-  backdrop-filter: blur(8px);
-}
-#score { font-size: 20px; font-weight: 850; color: var(--cyan); }
-.small { font-size: 11px; color: #a6c4d4; }
-#status { font-size: 12px; line-height: 1.5; }
-#crosshair {
-  position: absolute; left: 50%; top: 50%;
-  width: 18px; height: 18px; transform: translate(-50%,-50%);
-  border: 1px solid #00eaffaa; border-radius: 50%;
-}
-#crosshair:before, #crosshair:after {
-  content: ""; position: absolute; background: var(--cyan);
-}
-#crosshair:before { width: 1px; height: 28px; left: 8px; top: -6px; }
-#crosshair:after { height: 1px; width: 28px; top: 8px; left: -6px; }
-#bottom {
-  position: absolute; bottom: max(14px, env(safe-area-inset-bottom));
-  left: 12px; right: 12px;
-  display: flex; justify-content: space-between; align-items: end; gap: 8px;
-}
-#hint { max-width: 62%; font-size: 11px; color: #c5dbe8; }
-button {
-  color: white; background: #102536; border: 1px solid #28718a;
-  border-radius: 12px; padding: 11px 14px; font-size: 13px;
-  font-weight: 750; cursor: pointer; touch-action: manipulation;
-}
-button:active { transform: scale(.97); }
-button.primary { background: #006d83; border-color: var(--cyan); }
-button:disabled { opacity: .5; }
-#controls { display: flex; gap: 7px; pointer-events: auto; }
-#menu {
-  z-index: 20; display: flex; align-items: center; justify-content: center;
-  padding: 20px; background:
-    radial-gradient(ellipse at 50% 30%, #12334b 0%, #070e1b 45%, #020409 100%);
-}
-#menuCard {
-  width: min(100%, 440px); max-height: 90dvh; overflow: auto;
-  background: #08111fee; border: 1px solid #1c5367;
-  border-radius: 22px; padding: 22px;
-  box-shadow: 0 0 45px #00c8ff1a;
-}
-h1 { font-size: 27px; line-height: 1.1; margin: 0 0 7px; letter-spacing: 1px; }
-h1 span { color: var(--cyan); }
-#menuCard p { color: #aac2d2; font-size: 13px; line-height: 1.5; }
-.menuButtons { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 16px 0; }
-.menuButtons button { min-height: 48px; }
-#start { width: 100%; min-height: 52px; font-size: 15px; margin-top: 4px; }
-#startupStatus { min-height: 20px; color: var(--green); font-size: 12px; margin-top: 12px; }
-#permissionNote { font-size: 11px; color: #8faab9; }
-#errorBox {
-  z-index: 30; display: none; align-items: center; justify-content: center;
-  padding: 22px; background: #02050beF;
-}
-#errorContent {
-  max-width: 420px; width: 100%; padding: 20px;
-  border: 1px solid #763d46; background: #170c13;
-  border-radius: 16px;
-}
-#errorTitle { color: #ff8585; font-weight: 850; font-size: 19px; }
-#errorText { font-size: 13px; line-height: 1.6; color: #ead7df; white-space: pre-wrap; }
-#toast {
-  position: absolute; top: 25%; left: 50%; transform: translateX(-50%);
-  background: #061923eF; border: 1px solid var(--cyan);
-  border-radius: 12px; padding: 10px 16px; display: none;
-  color: white; font-weight: 800; white-space: nowrap;
-}
-#fireButton {
-  pointer-events: auto; border-radius: 50%; width: 64px; height: 64px;
-  padding: 0; background: #8d1726cc; border: 2px solid #ff707d;
-  font-size: 11px;
-}
-#modeLabel { color: var(--green); font-size: 11px; font-weight: 800; }
-@media (max-width: 360px) {
-  #hint { display: none; }
-  button { padding: 10px; font-size: 12px; }
-  #score { font-size: 17px; }
-}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;color:white;font-family:system-ui,-apple-system,sans-serif;touch-action:none}
+#camera,#game,#hud{position:fixed;inset:0;width:100%;height:100%}
+#camera{z-index:0;object-fit:cover;display:none;background:transparent}
+#game{z-index:1;pointer-events:none}
+#game canvas{display:block;width:100%;height:100%}
+#hud{z-index:5;pointer-events:none}
+.panel{background:rgba(5,12,24,.78);border:1px solid #25465c;border-radius:12px;padding:9px 11px;backdrop-filter:blur(7px)}
+#topbar{position:absolute;top:max(10px,env(safe-area-inset-top));left:10px;right:10px;display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+#score{font-size:20px;font-weight:900;color:#00eaff}
+.small{font-size:10px;color:#a6c6d7}
+#status{font-size:11px;line-height:1.65}
+#modeLabel{color:#57ffb0;font-weight:800;font-size:11px}
+#crosshair{position:absolute;left:50%;top:50%;width:16px;height:16px;transform:translate(-50%,-50%);border:1px solid #00eaff;border-radius:50%;opacity:.8}
+#crosshair:before,#crosshair:after{content:"";position:absolute;background:#00eaff}
+#crosshair:before{width:1px;height:24px;left:7px;top:-5px}
+#crosshair:after{height:1px;width:24px;top:7px;left:-5px}
+#bottom{position:absolute;bottom:max(12px,env(safe-area-inset-bottom));left:10px;right:10px;display:flex;align-items:flex-end;justify-content:space-between;gap:8px}
+#hint{max-width:58%;font-size:11px;line-height:1.4;color:#d0e5ef}
+#controls{display:flex;gap:6px;pointer-events:auto}
+button{background:#102638;color:white;border:1px solid #34718b;border-radius:11px;padding:11px 12px;font-size:12px;font-weight:800;touch-action:manipulation}
+button:active{transform:scale(.97)}
+button.primary{background:#006c83;border-color:#00eaff}
+#fireButton{height:58px;width:58px;border-radius:50%;padding:0;background:#7d1724;border:2px solid #ff6576;font-size:10px}
+#toast{display:none;position:absolute;top:25%;left:50%;transform:translateX(-50%);padding:10px 15px;border:1px solid #00eaff;border-radius:12px;background:#07141de8;font-weight:850;white-space:nowrap}
+#menu,#errorBox{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(2,7,15,.96)}
+#menuCard,#errorContent{width:min(100%,420px);max-height:90dvh;overflow:auto;padding:22px;border-radius:20px;border:1px solid #24546a;background:#08111fee}
+h1{font-size:27px;margin:0 0 8px}h1 span{color:#00eaff}
+p{font-size:13px;color:#b4cbd8;line-height:1.5}
+.menuButtons{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0}
+.menuButtons button{min-height:46px}
+#start{width:100%;min-height:50px}
+#startupStatus{font-size:12px;color:#5dffb0;min-height:20px;margin-top:12px}
+#permissionNote{font-size:11px;color:#92a9b7}
+#errorBox{display:none}
+#errorTitle{font-weight:900;color:#ff9292;font-size:18px}
+#errorText{font-size:13px;line-height:1.6;white-space:pre-wrap}
+@media(max-width:360px){#hint{display:none}button{padding:10px;font-size:11px}#score{font-size:17px}}
 </style>
 </head>
-
 <body>
 <video id="camera" autoplay playsinline muted></video>
 <div id="game"></div>
@@ -133,9 +60,9 @@ h1 span { color: var(--cyan); }
       <div id="modeLabel">MODO VR</div>
     </div>
     <div class="panel" id="status">
-      <div>Mãos: <b id="handsStatus">aguardando</b></div>
-      <div>Cabeça: <b id="headStatus">não ativada</b></div>
-      <div>Rifle: <b id="weaponStatus">pronto</b></div>
+      Mãos: <b id="handsStatus">aguardando</b><br>
+      Cabeça: <b id="headStatus">inativa</b><br>
+      Rifle: <b id="weaponStatus">pronto</b>
     </div>
   </div>
 
@@ -144,8 +71,8 @@ h1 span { color: var(--cyan); }
 
   <div id="bottom">
     <div id="hint" class="panel">
-      Mostre as mãos à câmera. Aproxime o polegar do indicador para disparar.
-      Toque em VR/AR para alternar a visualização.
+      Pinça: aproxime polegar e indicador para um disparo.
+      Abra os dedos para rearmar. Use VR/AR para alternar.
     </div>
     <div id="controls">
       <button id="switchMode">Mudar para AR</button>
@@ -157,7 +84,7 @@ h1 span { color: var(--cyan); }
 <div id="menu">
   <div id="menuCard">
     <h1>VR <span>MOBILE</span></h1>
-    <p>Rastreamento de duas mãos, moedas colecionáveis, rifle 3D e orientação da cabeça pelo iPhone.</p>
+    <p>Rastreamento de duas mãos, moedas, rifle 3D e orientação do iPhone. Cenário 3D removido para deixar somente os objetos do jogo.</p>
     <div class="menuButtons">
       <button id="vrButton" class="primary">🥽 Modo VR</button>
       <button id="arButton">📷 Modo AR</button>
@@ -166,17 +93,13 @@ h1 span { color: var(--cyan); }
     </div>
     <button id="start" class="primary">INICIAR JOGO</button>
     <div id="startupStatus">Pronto para iniciar.</div>
-    <p id="permissionNote">
-      Requer HTTPS e permissão para câmera. O iOS pode solicitar autorização
-      de movimento ao ativar o rastreamento de cabeça. VR usa visão dividida;
-      AR usa a câmera traseira como fundo.
-    </p>
+    <p id="permissionNote">Use HTTPS e permita o acesso à câmera. A permissão do sensor de movimento é solicitada ao tocar em Ativar cabeça.</p>
   </div>
 </div>
 
 <div id="errorBox">
   <div id="errorContent">
-    <div id="errorTitle">Não foi possível iniciar</div>
+    <div id="errorTitle">Erro</div>
     <p id="errorText"></p>
     <button id="closeError" class="primary">VOLTAR</button>
   </div>
@@ -193,854 +116,510 @@ const $ = id => document.getElementById(id);
 const video = $('camera');
 const gameRoot = $('game');
 
-const state = {
-  running: false,
-  cameraReady: false,
-  handsReady: false,
-  headReady: false,
-  headPermission: false,
-  mode: 'VR',
-  coins: 0,
-  hands: [],
-  pinch: [false, false],
-  lastShot: 0,
-  shotCooldown: 280,
-  lastFrame: 0,
-  animFrame: 0,
-  stream: null,
-  handsModel: null,
-  cameraStarting: false,
-  headStarting: false,
-  error: '',
-  toastUntil: 0,
-  renderWidth: 0,
-  renderHeight: 0
-};
-
 let renderer, scene, camera, leftCamera, rightCamera;
-let coinGroup, handGroup, effectsGroup, rifle;
-let coins = [];
-let rigs = [];
-let muzzleFlash;
-let raycaster;
-let audioCtx = null;
-let resizeObserver = null;
+let rifle, muzzleFlash, coinGroup, handGroup, effectsGroup, raycaster;
+let handsModel = null, stream = null, audioCtx = null;
+let running = false, cameraReady = false, modelReady = false;
+let cameraStarting = false, processing = false;
+let mode = 'VR', coinsCollected = 0;
+let animId = 0, lastFrame = 0, lastShot = 0;
+let toastTimer = 0, headActive = false;
+let handResults = [];
+const rigs = [], coins = [];
+const pinchState = [
+  {closed:0, open:0, armed:true, lost:0},
+  {closed:0, open:0, armed:true, lost:0}
+];
+const COOLDOWN = 350;
+const PINCH_CLOSE = 0.035;
+const PINCH_OPEN = 0.075;
+const HEAD = {alpha:0,beta:90,gamma:0,initialized:false};
+const UP = new THREE.Vector3(0,1,0);
 
-const HEAD = { alpha: 0, beta: 0, gamma: 0, ready: false };
-const tempVec = new THREE.Vector3();
-const tempVec2 = new THREE.Vector3();
-const tempQuat = new THREE.Quaternion();
-
-function setStartup(message, error = false) {
+function status(message, error=false) {
   $('startupStatus').textContent = message;
-  $('startupStatus').style.color = error ? '#ff8c8c' : '#55ff9b';
+  $('startupStatus').style.color = error ? '#ff8585' : '#5dffb0';
 }
-
-function showError(title, message) {
-  $('errorTitle').textContent = title;
-  $('errorText').textContent = message;
-  $('errorBox').style.display = 'flex';
+function errorBox(title,message) {
+  $('errorTitle').textContent=title;
+  $('errorText').textContent=message;
+  $('errorBox').style.display='flex';
 }
-
-function toast(message, duration = 1600) {
-  $('toast').textContent = message;
-  $('toast').style.display = 'block';
-  state.toastUntil = performance.now() + duration;
+function toast(message,ms=1000) {
+  $('toast').textContent=message;
+  $('toast').style.display='block';
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>$('toast').style.display='none',ms);
 }
-
 function updateHUD() {
-  $('score').textContent = 'MOEDAS: ' + state.coins;
-  $('handsStatus').textContent = state.hands.length
-    ? state.hands.length + ' detectada(s)'
-    : (state.handsReady ? 'procurando...' : 'não ativado');
-  $('headStatus').textContent = state.headReady ? 'ativo' : 'inativo';
-  $('weaponStatus').textContent = 'pronto';
-  $('modeLabel').textContent = 'MODO ' + state.mode;
-  $('switchMode').textContent = state.mode === 'VR' ? 'Mudar para AR' : 'Mudar para VR';
+  $('score').textContent='MOEDAS: '+coinsCollected;
+  $('handsStatus').textContent=handResults.length+' detectada(s)';
+  $('headStatus').textContent=headActive?'ativa':'inativa';
+  $('modeLabel').textContent='MODO '+mode;
+  $('switchMode').textContent=mode==='VR'?'Mudar para AR':'Mudar para VR';
 }
-
-function makeMaterial(color, emissive = color, roughness = 0.35, metalness = 0.45) {
+function material(color,emissive=color,metalness=.5,roughness=.3) {
   return new THREE.MeshStandardMaterial({
-    color, emissive, emissiveIntensity: 0.28, roughness, metalness
+    color,emissive,emissiveIntensity:.35,metalness,roughness
   });
 }
-
-function makeBox(parent, name, size, position, material, rotation) {
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(size[0], size[1], size[2]), material
-  );
-  mesh.name = name;
-  mesh.position.set(position[0], position[1], position[2]);
-  if (rotation) mesh.rotation.set(rotation[0], rotation[1], rotation[2]);
-  mesh.castShadow = false;
-  mesh.receiveShadow = false;
-  parent.add(mesh);
-  return mesh;
+function box(parent,size,pos,mat,rot=[0,0,0]) {
+  const m=new THREE.Mesh(new THREE.BoxGeometry(...size),mat);
+  m.position.set(...pos);m.rotation.set(...rot);parent.add(m);return m;
 }
-
-function makeCylinder(parent, name, rTop, rBottom, height, position, material, rotation) {
-  const mesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(rTop, rBottom, height, 12),
-    material
-  );
-  mesh.name = name;
-  mesh.position.set(position[0], position[1], position[2]);
-  if (rotation) mesh.rotation.set(rotation[0], rotation[1], rotation[2]);
-  parent.add(mesh);
-  return mesh;
+function cylinder(parent,r1,r2,h,pos,mat,rot=[0,0,0]) {
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,12),mat);
+  m.position.set(...pos);m.rotation.set(...rot);parent.add(m);return m;
 }
 
 function initThree() {
-  if (!window.THREE) {
-    throw new Error('A biblioteca Three.js não carregou. Verifique a internet e recarregue a página.');
-  }
+  if(!window.THREE) throw new Error('Three.js não carregou. Verifique a conexão.');
+  scene=new THREE.Scene();
+  // Sem fundo, neblina, chão, grade, estrelas ou cenário.
+  scene.background=null;
 
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x050a13);
-  scene.fog = new THREE.Fog(0x050a13, 8, 35);
+  camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,.05,100);
+  camera.position.set(0,0,0);
+  leftCamera=new THREE.PerspectiveCamera(72,.5,.05,100);
+  rightCamera=new THREE.PerspectiveCamera(72,.5,.05,100);
 
-  camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 100);
-  camera.position.set(0, 0, 4);
-
-  leftCamera = new THREE.PerspectiveCamera(72, 0.5, 0.05, 100);
-  rightCamera = new THREE.PerspectiveCamera(72, 0.5, 0.05, 100);
-
-  renderer = new THREE.WebGLRenderer({
-    antialias: false,
-    alpha: true,
-    powerPreference: 'high-performance',
-    stencil: false,
-    depth: true
+  renderer=new THREE.WebGLRenderer({
+    alpha:true,antialias:false,powerPreference:'high-performance',
+    depth:true,stencil:false
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-  renderer.setSize(innerWidth, innerHeight);
-  renderer.outputEncoding = THREE.sRGBEncoding;
-  renderer.setClearColor(0x000000, 0);
-  renderer.domElement.style.width = '100%';
-  renderer.domElement.style.height = '100%';
-  renderer.domElement.style.display = 'block';
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.setClearColor(0x000000,0);
+  renderer.outputEncoding=THREE.sRGBEncoding;
+  renderer.domElement.style.background='transparent';
   gameRoot.appendChild(renderer.domElement);
 
-  scene.add(new THREE.HemisphereLight(0x8bdcff, 0x171020, 1.35));
-  const light = new THREE.DirectionalLight(0xffffff, 1.2);
-  light.position.set(3, 7, 5);
-  scene.add(light);
+  scene.add(new THREE.HemisphereLight(0xc6f5ff,0x252b42,1.6));
+  const light=new THREE.DirectionalLight(0xffffff,1.1);
+  light.position.set(2,4,5);scene.add(light);
 
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(120, 120),
-    new THREE.MeshStandardMaterial({
-      color: 0x101827, roughness: 0.95, metalness: 0.05
-    })
-  );
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = -3.2;
-  scene.add(floor);
+  coinGroup=new THREE.Group();
+  handGroup=new THREE.Group();
+  effectsGroup=new THREE.Group();
+  scene.add(coinGroup,handGroup,effectsGroup);
+  raycaster=new THREE.Raycaster();
 
-  const grid = new THREE.GridHelper(120, 60, 0x123c50, 0x102334);
-  grid.position.y = -3.18;
-  scene.add(grid);
+  makeRifle();
+  makeHandRigs();
+  makeCoins(18);
 
-  coinGroup = new THREE.Group();
-  handGroup = new THREE.Group();
-  effectsGroup = new THREE.Group();
-  scene.add(coinGroup, handGroup, effectsGroup);
-
-  raycaster = new THREE.Raycaster();
-
-  createRifle();
-  createHandRigs();
-  createCoins(18);
-  createEnvironment();
-
-  window.addEventListener('resize', onResize, { passive: true });
-  onResize();
+  window.addEventListener('resize',resize,{passive:true});
+  resize();
 }
 
-function createEnvironment() {
-  // Pontos de luz e estruturas simples mantêm o cenário leve no iPhone.
-  const starMaterial = new THREE.MeshBasicMaterial({ color: 0x367a99 });
-  const starGeometry = new THREE.BufferGeometry();
-  const positions = [];
-  for (let i = 0; i < 280; i++) {
-    positions.push(
-      (Math.random() - 0.5) * 70,
-      (Math.random() - 0.5) * 35,
-      -Math.random() * 45 - 3
-    );
-  }
-  starGeometry.setAttribute('position',
-    new THREE.Float32BufferAttribute(positions, 3));
-  scene.add(new THREE.Points(starGeometry, starMaterial));
+function makeRifle() {
+  rifle=new THREE.Group();
+  const black=material(0x202a35,0x071019,.75,.3);
+  const metal=material(0x718594,0x182832,.9,.22);
+  const rubber=material(0x101820,0x06090d,.1,.8);
+  const cyan=new THREE.MeshBasicMaterial({color:0x00eaff});
 
-  const pillarMaterial = makeMaterial(0x172c3b, 0x09202c);
-  for (let i = 0; i < 12; i++) {
-    const x = (i - 5.5) * 4;
-    makeBox(scene, 'pillar', [0.35, 3.4, 0.35],
-      [x, -1.5, -8 - (i % 3) * 4], pillarMaterial);
-  }
-}
+  box(rifle,[.23,.22,.62],[0,0,0],black);
+  box(rifle,[.17,.08,.65],[0,.13,-.01],metal);
+  box(rifle,[.18,.15,.42],[0,-.01,.47],black);
+  box(rifle,[.2,.18,.07],[0,-.01,.68],rubber);
+  box(rifle,[.09,.09,.67],[0,.04,-.58],metal);
+  cylinder(rifle,.07,.07,.15,[0,.04,-.96],metal,[Math.PI/2,0,0]);
+  box(rifle,[.16,.15,.42],[0,.01,-.45],black);
+  box(rifle,[.13,.27,.16],[0,-.2,.1],rubber,[-.24,0,0]);
+  box(rifle,[.12,.27,.15],[0,-.22,-.07],black,[-.15,0,0]);
+  box(rifle,[.06,.035,.43],[0,.2,-.25],metal);
+  box(rifle,[.035,.12,.035],[0,.26,-.68],metal);
+  box(rifle,[.025,.035,.38],[.095,.11,-.38],cyan);
 
-function createRifle() {
-  rifle = new THREE.Group();
-  rifle.name = 'Rifle3D';
+  const optic=cylinder(rifle,.055,.055,.13,[0,.24,-.1],metal,[Math.PI/2,0,0]);
+  const lens=new THREE.Mesh(new THREE.CircleGeometry(.04,12),
+    new THREE.MeshBasicMaterial({color:0x00dfff}));
+  lens.position.set(0,.24,-.17);rifle.add(lens);
 
-  const bodyMat = makeMaterial(0x202a35, 0x06111a, 0.28, 0.75);
-  const metalMat = makeMaterial(0x657786, 0x14232d, 0.22, 0.9);
-  const gripMat = makeMaterial(0x111820, 0x080c11, 0.8, 0.12);
-  const glowMat = new THREE.MeshBasicMaterial({ color: 0x00eaff });
+  // Modelo preso à câmera; não depende de arquivos externos.
+  rifle.position.set(.36,-.34,-.75);
+  rifle.rotation.set(-.07,-.12,-.03);
+  camera.add(rifle);scene.add(camera);
 
-  makeBox(rifle, 'receiver', [0.23, 0.22, 0.62], [0, 0, 0], bodyMat);
-  makeBox(rifle, 'upper', [0.17, 0.08, 0.65], [0, 0.13, -0.01], metalMat);
-  makeBox(rifle, 'stock', [0.18, 0.15, 0.42], [0, -0.01, 0.47], bodyMat);
-  makeBox(rifle, 'stockPad', [0.2, 0.18, 0.07], [0, -0.01, 0.68], gripMat);
-  makeBox(rifle, 'barrel', [0.09, 0.09, 0.67], [0, 0.04, -0.58], metalMat);
-  makeCylinder(rifle, 'muzzle', 0.07, 0.07, 0.15,
-    [0, 0.04, -0.96], metalMat, [Math.PI / 2, 0, 0]);
-  makeBox(rifle, 'handguard', [0.16, 0.15, 0.42],
-    [0, 0.01, -0.45], bodyMat);
-  makeBox(rifle, 'grip', [0.13, 0.27, 0.16],
-    [0, -0.2, 0.1], gripMat, [-0.24, 0, 0]);
-  makeBox(rifle, 'magazine', [0.12, 0.27, 0.15],
-    [0, -0.22, -0.07], bodyMat, [-0.15, 0, 0]);
-  makeBox(rifle, 'sightRail', [0.06, 0.035, 0.43],
-    [0, 0.2, -0.25], metalMat);
-  makeBox(rifle, 'frontSight', [0.035, 0.12, 0.035],
-    [0, 0.26, -0.68], metalMat);
-  makeBox(rifle, 'energyStrip', [0.025, 0.035, 0.38],
-    [0.095, 0.11, -0.38], glowMat);
-
-  const optic = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.055, 0.055, 0.13, 12),
-    metalMat
+  muzzleFlash=new THREE.Mesh(
+    new THREE.SphereGeometry(.1,8,6),
+    new THREE.MeshBasicMaterial({color:0x9cffff,transparent:true,opacity:0})
   );
-  optic.rotation.x = Math.PI / 2;
-  optic.position.set(0, 0.24, -0.1);
-  rifle.add(optic);
-
-  const lens = new THREE.Mesh(
-    new THREE.CircleGeometry(0.04, 12),
-    new THREE.MeshBasicMaterial({
-      color: 0x00dfff, transparent: true, opacity: 0.85
-    })
-  );
-  lens.position.set(0, 0.24, -0.17);
-  rifle.add(lens);
-
-  // Rifle permanece preso à câmera, como arma em primeira pessoa.
-  rifle.position.set(0.36, -0.34, -0.75);
-  rifle.rotation.set(-0.07, -0.12, -0.03);
-  camera.add(rifle);
-  scene.add(camera);
-
-  muzzleFlash = new THREE.Mesh(
-    new THREE.SphereGeometry(0.105, 8, 6),
-    new THREE.MeshBasicMaterial({
-      color: 0x8cffff, transparent: true, opacity: 0
-    })
-  );
-  muzzleFlash.position.set(0.36, -0.3, -1.76);
+  muzzleFlash.position.set(.36,-.3,-1.76);
   camera.add(muzzleFlash);
 }
 
-function createHandRigs() {
-  const colors = [0x00eaff, 0xffa34d];
-  for (let h = 0; h < 2; h++) {
-    const root = new THREE.Group();
-    const joints = [];
-    const bones = [];
+function makeHandRigs() {
+  const colors=[0x00eaff,0xffa34d];
+  const links=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],
+    [5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],
+    [13,17],[17,18],[18,19],[19,20],[0,17]];
 
-    const jointMaterial = new THREE.MeshStandardMaterial({
-      color: colors[h], emissive: colors[h],
-      emissiveIntensity: 0.5, roughness: 0.3
+  for(let h=0;h<2;h++) {
+    const root=new THREE.Group(),joints=[],bones=[];
+    const mat=new THREE.MeshStandardMaterial({
+      color:colors[h],emissive:colors[h],emissiveIntensity:.55
     });
-
-    for (let i = 0; i < 21; i++) {
-      const joint = new THREE.Mesh(
-        new THREE.SphereGeometry(i === 8 ? 0.075 : 0.045, 8, 6),
-        jointMaterial
+    for(let i=0;i<21;i++) {
+      const joint=new THREE.Mesh(
+        new THREE.SphereGeometry(i===8?.07:.043,8,6),mat
       );
-      root.add(joint);
-      joints.push(joint);
+      root.add(joint);joints.push(joint);
     }
-
-    const connections = [
-      [0,1],[1,2],[2,3],[3,4],
-      [0,5],[5,6],[6,7],[7,8],
-      [5,9],[9,10],[10,11],[11,12],
-      [9,13],[13,14],[14,15],[15,16],
-      [13,17],[17,18],[18,19],[19,20],
-      [0,17]
-    ];
-
-    for (const [a,b] of connections) {
-      const mesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.018, 0.018, 1, 5),
-        jointMaterial
-      );
-      root.add(mesh);
-      bones.push({ mesh, a, b });
+    for(const [a,b] of links) {
+      const mesh=new THREE.Mesh(new THREE.CylinderGeometry(.016,.016,1,5),mat);
+      root.add(mesh);bones.push({mesh,a,b});
     }
-
-    root.visible = false;
-    handGroup.add(root);
-    rigs.push({ root, joints, bones });
+    root.visible=false;handGroup.add(root);rigs.push({root,joints,bones});
   }
 }
 
-function createCoins(count) {
-  const gold = new THREE.MeshStandardMaterial({
-    color: 0xffca43, emissive: 0x9a4e00,
-    emissiveIntensity: 0.55, metalness: 0.85, roughness: 0.22
-  });
-  const edge = new THREE.MeshStandardMaterial({
-    color: 0xffef9b, metalness: 0.9, roughness: 0.18
-  });
-
-  for (let i = 0; i < count; i++) {
-    const group = new THREE.Group();
-    const disc = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.19, 0.19, 0.055, 20),
-      gold
-    );
-    disc.rotation.x = Math.PI / 2;
-    group.add(disc);
-
-    const inner = new THREE.Mesh(
-      new THREE.TorusGeometry(0.13, 0.018, 5, 18),
-      edge
-    );
-    group.add(inner);
-
-    group.position.set(
-      (Math.random() - 0.5) * 8,
-      (Math.random() - 0.5) * 4,
-      -3 - Math.random() * 15
-    );
-    group.userData = {
-      baseY: group.position.y,
-      phase: Math.random() * Math.PI * 2,
-      active: true
-    };
-    coinGroup.add(group);
-    coins.push(group);
+function makeCoins(count) {
+  const gold=material(0xffc83d,0x9a4e00,.85,.22);
+  const edge=material(0xffed9b,0x7d4c00,.9,.2);
+  for(let i=0;i<count;i++) {
+    const g=new THREE.Group();
+    const disc=new THREE.Mesh(new THREE.CylinderGeometry(.18,.18,.055,18),gold);
+    disc.rotation.x=Math.PI/2;g.add(disc);
+    g.add(new THREE.Mesh(new THREE.TorusGeometry(.125,.016,5,16),edge));
+    respawnCoin(g,true);g.userData.phase=Math.random()*6.28;
+    coinGroup.add(g);coins.push(g);
   }
 }
-
-function respawnCoin(coin) {
-  coin.position.set(
-    (Math.random() - 0.5) * 8,
-    (Math.random() - 0.5) * 4,
-    -4 - Math.random() * 18
-  );
-  coin.userData.baseY = coin.position.y;
-  coin.userData.phase = Math.random() * Math.PI * 2;
+function respawnCoin(g,initial=false) {
+  g.position.set((Math.random()-.5)*6,(Math.random()-.5)*3.5,
+    initial?(-3-Math.random()*12):(-4-Math.random()*15));
+  g.userData.baseY=g.position.y;
 }
 
-function onResize() {
-  if (!renderer || !camera) return;
-  const w = Math.max(1, window.innerWidth);
-  const h = Math.max(1, window.innerHeight);
-
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-
-  leftCamera.aspect = (w / 2) / h;
-  rightCamera.aspect = (w / 2) / h;
-  leftCamera.fov = rightCamera.fov = 72;
-  leftCamera.updateProjectionMatrix();
-  rightCamera.updateProjectionMatrix();
-
-  renderer.setSize(w, h, false);
-  state.renderWidth = w;
-  state.renderHeight = h;
+function resize() {
+  if(!renderer)return;
+  const w=Math.max(1,innerWidth),h=Math.max(1,innerHeight);
+  camera.aspect=w/h;camera.updateProjectionMatrix();
+  leftCamera.aspect=(w/2)/h;rightCamera.aspect=(w/2)/h;
+  leftCamera.fov=rightCamera.fov=72;
+  leftCamera.updateProjectionMatrix();rightCamera.updateProjectionMatrix();
+  renderer.setSize(w,h,false);
 }
 
-function syncStereoCameras() {
-  camera.updateMatrixWorld(true);
-  leftCamera.position.copy(camera.position);
-  rightCamera.position.copy(camera.position);
-  leftCamera.quaternion.copy(camera.quaternion);
-  rightCamera.quaternion.copy(camera.quaternion);
-
-  const eyeSeparation = 0.032;
-  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-  leftCamera.position.addScaledVector(right, -eyeSeparation);
-  rightCamera.position.addScaledVector(right, eyeSeparation);
-
-  leftCamera.updateMatrixWorld(true);
-  rightCamera.updateMatrixWorld(true);
-}
-
-function renderFrame() {
-  if (!renderer || !scene || !camera) return;
-
-  if (state.mode === 'VR') {
-    syncStereoCameras();
+function render() {
+  const w=innerWidth,h=innerHeight;
+  if(mode==='VR') {
+    leftCamera.position.copy(camera.position);
+    rightCamera.position.copy(camera.position);
+    leftCamera.quaternion.copy(camera.quaternion);
+    rightCamera.quaternion.copy(camera.quaternion);
+    const right=new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion);
+    leftCamera.position.addScaledVector(right,-.032);
+    rightCamera.position.addScaledVector(right,.032);
+    leftCamera.updateMatrixWorld(true);rightCamera.updateMatrixWorld(true);
     renderer.setScissorTest(true);
-    renderer.setViewport(0, 0, state.renderWidth, state.renderHeight);
-    renderer.setScissor(0, 0, Math.floor(state.renderWidth / 2), state.renderHeight);
-    renderer.render(scene, leftCamera);
-    renderer.setViewport(Math.floor(state.renderWidth / 2), 0,
-      state.renderWidth - Math.floor(state.renderWidth / 2), state.renderHeight);
-    renderer.setScissor(Math.floor(state.renderWidth / 2), 0,
-      state.renderWidth - Math.floor(state.renderWidth / 2), state.renderHeight);
-    renderer.render(scene, rightCamera);
+    renderer.setViewport(0,0,Math.floor(w/2),h);
+    renderer.setScissor(0,0,Math.floor(w/2),h);
+    renderer.render(scene,leftCamera);
+    renderer.setViewport(Math.floor(w/2),0,w-Math.floor(w/2),h);
+    renderer.setScissor(Math.floor(w/2),0,w-Math.floor(w/2),h);
+    renderer.render(scene,rightCamera);
     renderer.setScissorTest(false);
   } else {
-    renderer.setViewport(0, 0, state.renderWidth, state.renderHeight);
-    renderer.setScissorTest(false);
-    renderer.render(scene, camera);
+    renderer.setViewport(0,0,w,h);
+    renderer.render(scene,camera);
   }
 }
 
-function onHeadOrientation(event) {
-  // iOS/Android entregam ângulos em graus. Valores nulos não substituem
-  // o último valor válido do sensor.
-  if (Number.isFinite(event.alpha)) HEAD.alpha = event.alpha;
-  if (Number.isFinite(event.beta)) HEAD.beta = event.beta;
-  if (Number.isFinite(event.gamma)) HEAD.gamma = event.gamma;
-
-  if (!HEAD.ready) {
-    HEAD.ready = true;
-    state.headReady = true;
-    updateHUD();
-    toast('Rastreamento de cabeça ativo');
-  }
-
-  // Alpha = rotação horizontal; beta/gamma inclinam a visão.
-  // Suavização para reduzir tremores do sensor.
-  const deg = Math.PI / 180;
-  const target = new THREE.Euler(
-    THREE.MathUtils.clamp((HEAD.beta - 90) * deg, -1.05, 1.05),
-    -HEAD.alpha * deg,
-    -HEAD.gamma * deg,
-    'YXZ'
-  );
-  tempQuat.setFromEuler(target);
-  camera.quaternion.slerp(tempQuat, 0.16);
-}
-
-async function enableHeadTracking() {
-  if (state.headStarting || state.headReady) return;
-  state.headStarting = true;
-
+async function enableHead() {
   try {
-    if (!('DeviceOrientationEvent' in window)) {
-      throw new Error('Este navegador não oferece DeviceOrientationEvent.');
+    if(!('DeviceOrientationEvent' in window))
+      throw new Error('Este navegador não oferece sensor de orientação.');
+    if(typeof DeviceOrientationEvent.requestPermission==='function') {
+      const result=await DeviceOrientationEvent.requestPermission();
+      if(result!=='granted') throw new Error('Permissão do sensor foi negada.');
     }
-
-    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-      const permission = await DeviceOrientationEvent.requestPermission();
-      if (permission !== 'granted') {
-        throw new Error('Permissão de movimento negada. Ative-a e tente novamente.');
-      }
-    }
-
-    window.addEventListener('deviceorientation', onHeadOrientation, true);
-    state.headPermission = true;
-    setStartup('Permissão de orientação concedida. Movimente o iPhone.');
-    toast('Movimente o iPhone para calibrar');
-  } catch (err) {
-    state.headReady = false;
-    $('headStatus').textContent = 'indisponível';
-    setStartup('Sensor: ' + (err.message || 'não foi possível ativar.'), true);
-    showError('Sensor de cabeça indisponível',
-      (err.message || String(err)) +
-      '\n\nNo iPhone, abra o jogo em HTTPS e toque em “Ativar cabeça”.');
-  } finally {
-    state.headStarting = false;
-    updateHUD();
+    window.addEventListener('deviceorientation',onOrientation,true);
+    status('Sensor ativado. Movimente o iPhone.');
+    toast('Movimente o iPhone para orientar a visão');
+  } catch(e) {
+    errorBox('Sensor indisponível',e.message+'\nAbra o jogo em HTTPS e tente novamente.');
   }
+}
+function onOrientation(e) {
+  if(e.alpha==null||e.beta==null)return;
+  HEAD.alpha=e.alpha;HEAD.beta=e.beta;HEAD.gamma=e.gamma||0;
+  const rad=Math.PI/180;
+  const target=new THREE.Euler(
+    THREE.MathUtils.clamp((HEAD.beta-90)*rad,-1.05,1.05),
+    -HEAD.alpha*rad,-HEAD.gamma*rad,'YXZ'
+  );
+  const q=new THREE.Quaternion().setFromEuler(target);
+  if(!HEAD.initialized) {
+    camera.quaternion.copy(q);
+    HEAD.initialized=true;
+  } else camera.quaternion.slerp(q,.12);
+  headActive=true;updateHUD();
 }
 
 async function startCamera() {
-  if (state.cameraStarting || state.cameraReady) return;
-  state.cameraStarting = true;
-  setStartup('Solicitando acesso à câmera...');
-
+  if(cameraStarting||cameraReady)return;
+  cameraStarting=true;
   try {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      throw new Error('Câmera indisponível. Use Safari em HTTPS ou um navegador compatível.');
-    }
-
-    state.stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 640 },
-        height: { ideal: 480 },
-        frameRate: { ideal: 24, max: 30 }
+    if(!navigator.mediaDevices?.getUserMedia)
+      throw new Error('Câmera indisponível. Abra a página em HTTPS no Safari.');
+    stream=await navigator.mediaDevices.getUserMedia({
+      audio:false,
+      video:{
+        facingMode:{ideal:'environment'},
+        width:{ideal:640},height:{ideal:480},
+        frameRate:{ideal:24,max:30}
       }
     });
-
-    video.srcObject = state.stream;
-    await new Promise((resolve, reject) => {
-      if (video.readyState >= 2) return resolve();
-      const timer = setTimeout(() => reject(
-        new Error('A câmera demorou demais para iniciar.')), 12000);
-      video.onloadedmetadata = () => {
-        clearTimeout(timer);
-        resolve();
-      };
-      video.onerror = () => {
-        clearTimeout(timer);
-        reject(new Error('Falha ao carregar o vídeo da câmera.'));
-      };
+    video.srcObject=stream;
+    await new Promise((resolve,reject)=>{
+      if(video.readyState>=2)return resolve();
+      const timer=setTimeout(()=>reject(new Error('Tempo limite ao abrir a câmera.')),12000);
+      video.onloadedmetadata=()=>{clearTimeout(timer);resolve()};
+      video.onerror=()=>{clearTimeout(timer);reject(new Error('Falha no vídeo da câmera.'))};
     });
-
     await video.play();
-    state.cameraReady = true;
-    video.style.display = state.mode === 'AR' ? 'block' : 'none';
-    setStartup('Câmera ativa.');
-    await startHandsModel();
-  } catch (err) {
-    setStartup('Erro na câmera: ' + (err.message || String(err)), true);
-    showError('Câmera indisponível',
-      (err.message || String(err)) +
-      '\n\nVerifique a permissão de câmera em Ajustes > Safari e tente novamente.');
-  } finally {
-    state.cameraStarting = false;
-    updateHUD();
-  }
+    cameraReady=true;
+    video.style.display=mode==='AR'?'block':'none';
+    await startHands();
+    status('Câmera e rastreamento prontos.');
+  } catch(e) {
+    errorBox('Câmera indisponível',
+      (e.message||String(e))+'\nVerifique a permissão da câmera em Ajustes do iPhone.');
+  } finally {cameraStarting=false}
 }
 
-async function startHandsModel() {
-  if (state.handsReady) return;
-  if (!window.Hands) {
-    throw new Error('MediaPipe Hands não carregou. Verifique a conexão e recarregue.');
-  }
-
-  const hands = new Hands({
-    locateFile: file => 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/' + file
+async function startHands() {
+  if(modelReady)return;
+  if(!window.Hands)throw new Error('MediaPipe não carregou. Verifique a conexão.');
+  handsModel=new Hands({
+    locateFile:file=>'https://cdn.jsdelivr.net/npm/@mediapipe/hands/'+file
   });
-
-  hands.setOptions({
-    maxNumHands: 2,
-    modelComplexity: 0,
-    minDetectionConfidence: 0.55,
-    minTrackingConfidence: 0.55,
-    selfieMode: false
+  handsModel.setOptions({
+    maxNumHands:2,modelComplexity:0,
+    minDetectionConfidence:.6,minTrackingConfidence:.6,selfieMode:false
   });
-
-  hands.onResults(onHandsResults);
-  state.handsModel = hands;
-  state.handsReady = true;
-  setStartup('Rastreamento de duas mãos ativo.');
+  handsModel.onResults(onHands);
+  modelReady=true;
 }
 
-function onHandsResults(results) {
-  const landmarks = results.multiHandLandmarks || [];
-  const handCount = Math.min(2, landmarks.length);
-  state.hands = [];
-
-  for (let h = 0; h < 2; h++) {
-    const rig = rigs[h];
-    if (h >= handCount) {
-      rig.root.visible = false;
-      state.pinch[h] = false;
+function onHands(results) {
+  const list=(results.multiHandLandmarks||[]).slice(0,2);
+  handResults=[];
+  for(let h=0;h<2;h++) {
+    const rig=rigs[h],p=pinchState[h];
+    if(!list[h]) {
+      rig.root.visible=false;
+      p.closed=0;p.open=0;p.lost++;
+      // Perder brevemente o rastreamento não rearma o gatilho.
+      // Só rearma quando a mão volta e os dedos abrem claramente.
       continue;
     }
-
-    const lm = landmarks[h];
-    rig.root.visible = true;
-    const mapped = [];
-
-    for (let i = 0; i < 21; i++) {
-      // A câmera captura mãos no espaço da imagem. Convertemos para
-      // coordenadas aproximadas da cena 3D à frente da câmera.
-      const x = (0.5 - lm[i].x) * 5.4;
-      const y = (0.5 - lm[i].y) * 3.5;
-      const z = -1.5 - (lm[i].z || 0) * 2.0;
-      mapped.push(new THREE.Vector3(x, y, z));
-      rig.joints[i].position.copy(mapped[i]);
-    }
-
-    for (const bone of rig.bones) {
-      const a = mapped[bone.a], b = mapped[bone.b];
-      const delta = tempVec.copy(b).sub(a);
-      const length = delta.length();
-      bone.mesh.position.copy(a).addScaledVector(delta, 0.5);
-      bone.mesh.scale.set(1, Math.max(length, 0.001), 1);
-      bone.mesh.quaternion.setFromUnitVectors(
-        new THREE.Vector3(0, 1, 0), delta.normalize()
+    p.lost=0;
+    const lm=list[h],points=[];
+    rig.root.visible=true;
+    for(let i=0;i<21;i++) {
+      const v=new THREE.Vector3(
+        (.5-lm[i].x)*5.4,
+        (.5-lm[i].y)*3.5,
+        -1.5-(lm[i].z||0)*2
       );
+      points.push(v);rig.joints[i].position.copy(v);
+    }
+    for(const b of rig.bones) {
+      const a=points[b.a],z=points[b.b];
+      const d=new THREE.Vector3().subVectors(z,a);
+      b.mesh.position.copy(a).addScaledVector(d,.5);
+      b.mesh.scale.set(1,Math.max(d.length(),.001),1);
+      b.mesh.quaternion.setFromUnitVectors(UP,d.normalize());
     }
 
-    const thumb = lm[4];
-    const index = lm[8];
-    const distance = Math.hypot(thumb.x - index.x, thumb.y - index.y);
-    const isPinching = distance < 0.052;
+    const distance=Math.hypot(lm[4].x-lm[8].x,lm[4].y-lm[8].y);
 
-    if (isPinching && !state.pinch[h]) {
-      shoot('pinch');
+    // Histerese e confirmação em múltiplos frames:
+    // fecha abaixo de 0.035 por 3 frames para disparar;
+    // abre acima de 0.075 por 4 frames para rearmar.
+    if(distance<PINCH_CLOSE) {
+      p.closed++;
+      p.open=0;
+      if(p.armed&&p.closed>=3) {
+        p.armed=false;
+        shoot('pinch');
+      }
+    } else if(distance>PINCH_OPEN) {
+      p.open++;
+      p.closed=0;
+      if(p.open>=4)p.armed=true;
+    } else {
+      p.closed=0;
+      p.open=0;
     }
-    state.pinch[h] = isPinching;
 
-    state.hands.push({ landmarks: lm, points: mapped });
+    handResults.push({landmarks:lm,points});
   }
-
   updateHUD();
 }
 
 function initAudio() {
-  if (audioCtx) return;
   try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (AudioContext) audioCtx = new AudioContext();
-  } catch (_) {}
+    if(!audioCtx) {
+      const C=window.AudioContext||window.webkitAudioContext;
+      if(C)audioCtx=new C();
+    }
+    if(audioCtx?.state==='suspended')audioCtx.resume();
+  } catch(e) {}
 }
-
-function playShotSound() {
-  if (!audioCtx) return;
-  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
-
+function soundShot() {
+  if(!audioCtx)return;
   try {
-    const now = audioCtx.currentTime;
-    const oscillator = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    oscillator.type = 'sawtooth';
-    oscillator.frequency.setValueAtTime(170, now);
-    oscillator.frequency.exponentialRampToValueAtTime(42, now + 0.11);
-    gain.gain.setValueAtTime(0.15, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
-    oscillator.connect(gain);
-    gain.connect(audioCtx.destination);
-    oscillator.start(now);
-    oscillator.stop(now + 0.14);
-  } catch (_) {}
+    const t=audioCtx.currentTime;
+    const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
+    osc.type='sawtooth';
+    osc.frequency.setValueAtTime(150,t);
+    osc.frequency.exponentialRampToValueAtTime(45,t+.1);
+    gain.gain.setValueAtTime(.12,t);
+    gain.gain.exponentialRampToValueAtTime(.001,t+.12);
+    osc.connect(gain);gain.connect(audioCtx.destination);
+    osc.start(t);osc.stop(t+.13);
+  } catch(e) {}
 }
-
-function createTracer() {
-  const start = new THREE.Vector3(0.36, -0.3, -1.75);
+function tracer() {
+  const start=new THREE.Vector3(.36,-.3,-1.75);
   camera.localToWorld(start);
-  const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-  const end = start.clone().addScaledVector(direction, 16);
-
-  const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
-  const material = new THREE.LineBasicMaterial({
-    color: 0x75faff, transparent: true, opacity: 0.9
-  });
-  const line = new THREE.Line(geometry, material);
-  line.userData.life = 0.12;
+  const dir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+  const end=start.clone().addScaledVector(dir,18);
+  const geom=new THREE.BufferGeometry().setFromPoints([start,end]);
+  const mat=new THREE.LineBasicMaterial({color:0x72faff,transparent:true,opacity:.9});
+  const line=new THREE.Line(geom,mat);line.userData.life=.12;
   effectsGroup.add(line);
-
-  const light = new THREE.PointLight(0x00eaff, 2, 3);
-  light.position.copy(start);
-  effectsGroup.add(light);
-  light.userData.life = 0.08;
 }
 
 function shoot(source) {
-  if (!state.running) {
-    toast('Toque em INICIAR JOGO primeiro');
-    return;
+  if(!running)return;
+  const now=performance.now();
+  if(now-lastShot<COOLDOWN)return;
+  lastShot=now;
+
+  initAudio();soundShot();
+  if(muzzleFlash) {
+    muzzleFlash.material.opacity=1;
+    muzzleFlash.scale.setScalar(1+Math.random()*.6);
   }
-
-  const now = performance.now();
-  if (now - state.lastShot < state.shotCooldown) return;
-  state.lastShot = now;
-
-  initAudio();
-  playShotSound();
-
-  if (muzzleFlash) {
-    muzzleFlash.material.opacity = 1;
-    muzzleFlash.scale.setScalar(1 + Math.random() * 0.7);
+  if(rifle) {
+    rifle.position.z=-.70;
+    setTimeout(()=>{if(rifle)rifle.position.z=-.75},65);
   }
-  rifle.rotation.x = -0.04;
-  setTimeout(() => {
-    if (rifle) rifle.rotation.x = -0.07;
-  }, 80);
+  tracer();
+  $('weaponStatus').textContent='disparo';
+  toast('DISPARO!',450);
 
-  createTracer();
-  $('weaponStatus').textContent = 'disparo';
-  toast('DISPARO!', 450);
-
-  // O disparo também pode coletar moedas que estejam na mira.
-  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-  const activeCoins = coins.filter(c => c.visible);
-  const hits = raycaster.intersectObjects(activeCoins, true);
-
-  if (hits.length) {
-    let target = hits[0].object;
-    while (target.parent && target.parent !== coinGroup) {
-      target = target.parent;
-    }
-    if (target.parent === coinGroup) {
-      state.coins++;
-      respawnCoin(target);
-      updateHUD();
-      toast('MOEDA COLETADA!', 900);
+  raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
+  const hits=raycaster.intersectObjects(coins,true);
+  if(hits.length) {
+    let target=hits[0].object;
+    while(target.parent&&target.parent!==coinGroup)target=target.parent;
+    if(target.parent===coinGroup) {
+      coinsCollected++;respawnCoin(target);updateHUD();
+      toast('+1 MOEDA',750);
     }
   }
 }
 
-function collectCoins(time) {
-  const activePoints = [];
-  for (const hand of state.hands) {
-    if (hand.points && hand.points[8]) activePoints.push(hand.points[8]);
+function updateCoins(now) {
+  for(const c of coins) {
+    c.rotation.y+=.018;
+    c.position.y=c.userData.baseY+Math.sin(now*.0018+c.userData.phase)*.14;
   }
-
-  for (const coin of coins) {
-    coin.rotation.y += 0.018;
-    coin.rotation.z += 0.006;
-    coin.position.y = coin.userData.baseY +
-      Math.sin(time * 0.0018 + coin.userData.phase) * 0.16;
-
-    for (const point of activePoints) {
-      // Ponta do indicador pode apanhar uma moeda próxima.
-      if (coin.position.distanceTo(point) < 0.38) {
-        state.coins++;
-        respawnCoin(coin);
-        updateHUD();
-        toast('+1 MOEDA', 650);
-        break;
+  // Coleta ao encostar a ponta do indicador na moeda.
+  for(const hand of handResults) {
+    const tip=hand.points[8];
+    for(const c of coins) {
+      if(c.position.distanceTo(tip)<.32) {
+        coinsCollected++;respawnCoin(c);updateHUD();toast('+1 MOEDA',650);
       }
     }
   }
 }
 
 async function frame(now) {
-  state.animFrame = requestAnimationFrame(frame);
-  if (!state.running || !renderer) return;
+  if(!running)return;
+  animId=requestAnimationFrame(frame);
+  if(modelReady&&video.readyState>=2&&!processing) {
+    processing=true;
+    try {await handsModel.send({image:video})}
+    catch(e){console.warn('Rastreamento:',e)}
+    finally {processing=false}
+  }
+  updateCoins(now);
+  const dt=Math.min(.05,(now-(lastFrame||now))/1000);
+  lastFrame=now;
 
-  const delta = Math.min(0.05, (now - (state.lastFrame || now)) / 1000);
-  state.lastFrame = now;
-
-  if (state.handsReady && video.readyState >= 2 && !state.processingHands) {
-    state.processingHands = true;
-    try {
-      await state.handsModel.send({ image: video });
-    } catch (err) {
-      console.warn('MediaPipe:', err);
-    } finally {
-      state.processingHands = false;
+  for(let i=effectsGroup.children.length-1;i>=0;i--) {
+    const obj=effectsGroup.children[i];
+    obj.userData.life-=dt;
+    if(obj.material?.opacity!==undefined)
+      obj.material.opacity=Math.max(0,obj.userData.life/.12);
+    if(obj.userData.life<=0) {
+      effectsGroup.remove(obj);
+      obj.geometry?.dispose();obj.material?.dispose();
     }
   }
-
-  collectCoins(now);
-
-  for (let i = effectsGroup.children.length - 1; i >= 0; i--) {
-    const obj = effectsGroup.children[i];
-    if (obj.userData.life !== undefined) {
-      obj.userData.life -= delta;
-      if (obj.material && obj.material.opacity !== undefined) {
-        obj.material.opacity = Math.max(0, obj.userData.life / 0.12);
-      }
-      if (obj.userData.life <= 0) {
-        effectsGroup.remove(obj);
-        if (obj.geometry) obj.geometry.dispose();
-        if (obj.material) obj.material.dispose();
-      }
-    }
+  if(muzzleFlash) {
+    muzzleFlash.material.opacity=Math.max(0,muzzleFlash.material.opacity-dt*12);
   }
-
-  if (muzzleFlash && muzzleFlash.material.opacity > 0) {
-    muzzleFlash.material.opacity = Math.max(0, muzzleFlash.material.opacity - delta * 12);
-  }
-
-  if (state.toastUntil && now > state.toastUntil) {
-    $('toast').style.display = 'none';
-    state.toastUntil = 0;
-  }
-
-  renderFrame();
+  render();
 }
 
-function setMode(mode) {
-  state.mode = mode === 'AR' ? 'AR' : 'VR';
-  video.style.display = state.mode === 'AR' && state.cameraReady ? 'block' : 'none';
-
-  if (state.mode === 'AR') {
-    // Mantém a câmera traseira como fundo e o rifle/objetos como camada 3D.
-    scene.background = null;
-    scene.fog = null;
-    renderer.setClearColor(0x000000, 0);
-  } else {
-    scene.background = new THREE.Color(0x050a13);
-    scene.fog = new THREE.Fog(0x050a13, 8, 35);
-    renderer.setClearColor(0x000000, 0);
-  }
-
-  $('switchMode').textContent = state.mode === 'VR' ? 'Mudar para AR' : 'Mudar para VR';
+function setMode(next) {
+  mode=next==='AR'?'AR':'VR';
+  video.style.display=mode==='AR'&&cameraReady?'block':'none';
   updateHUD();
 }
-
 async function startGame() {
   try {
+    if(!renderer)initThree();
+    running=true;
+    $('menu').style.display='none';
+    $('errorBox').style.display='none';
+    if(!cameraReady)await startCamera();
+    if(!running)return;
     initAudio();
-    if (!renderer) initThree();
-
-    state.running = true;
-    $('menu').style.display = 'none';
-    $('errorBox').style.display = 'none';
-
-    if (!state.cameraReady) {
-      await startCamera();
-    }
-
-    if (state.headPermission && !state.headReady) {
-      // O sensor será considerado ativo após chegar o primeiro evento válido.
-      setStartup('Aguardando orientação do iPhone...');
-    }
-
-    updateHUD();
-    cancelAnimationFrame(state.animFrame);
-    state.animFrame = requestAnimationFrame(frame);
-  } catch (err) {
-    state.running = false;
-    showError('Erro ao iniciar o jogo',
-      (err.message || String(err)) +
-      '\n\nConfira se as bibliotecas carregaram e tente novamente.');
+    cancelAnimationFrame(animId);
+    lastFrame=0;
+    animId=requestAnimationFrame(frame);
+  } catch(e) {
+    running=false;
+    errorBox('Não foi possível iniciar',e.message||String(e));
   }
 }
 
-$('start').addEventListener('click', startGame);
-$('cameraButton').addEventListener('click', async () => {
-  try {
-    if (!renderer) initThree();
-    await startCamera();
-  } catch (err) {
-    showError('Erro na câmera', err.message || String(err));
-  }
+$('start').addEventListener('click',startGame);
+$('cameraButton').addEventListener('click',async()=>{
+  try {if(!renderer)initThree();await startCamera()}
+  catch(e){errorBox('Erro na câmera',e.message||String(e))}
 });
-$('headButton').addEventListener('click', enableHeadTracking);
-$('vrButton').addEventListener('click', () => setMode('VR'));
-$('arButton').addEventListener('click', () => setMode('AR'));
-
-$('switchMode').addEventListener('click', () => {
-  setMode(state.mode === 'VR' ? 'AR' : 'VR');
-});
-
-$('fireButton').addEventListener('pointerdown', event => {
-  event.preventDefault();
+$('headButton').addEventListener('click',enableHead);
+$('vrButton').addEventListener('click',()=>setMode('VR'));
+$('arButton').addEventListener('click',()=>setMode('AR'));
+$('switchMode').addEventListener('click',()=>setMode(mode==='VR'?'AR':'VR'));
+$('fireButton').addEventListener('pointerdown',e=>{
+  e.preventDefault();
   shoot('button');
 });
+$('closeError').addEventListener('click',()=>$('errorBox').style.display='none');
 
-$('closeError').addEventListener('click', () => {
-  $('errorBox').style.display = 'none';
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden)cancelAnimationFrame(animId);
+  else if(running){lastFrame=0;animId=requestAnimationFrame(frame)}
 });
-
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    // Reduz carga quando o Safari fica em segundo plano.
-    if (state.animFrame) cancelAnimationFrame(state.animFrame);
-  } else if (state.running) {
-    state.lastFrame = 0;
-    state.animFrame = requestAnimationFrame(frame);
-  }
+window.addEventListener('pagehide',()=>{
+  running=false;
+  if(stream)stream.getTracks().forEach(t=>t.stop());
+  if(handsModel?.close)handsModel.close();
+  if(renderer)renderer.dispose();
 });
-
-window.addEventListener('pagehide', () => {
-  if (state.stream) {
-    state.stream.getTracks().forEach(track => track.stop());
-  }
-  if (state.handsModel && state.handsModel.close) {
-    try { state.handsModel.close(); } catch (_) {}
-  }
-  if (renderer) renderer.dispose();
-});
-
 updateHUD();
 })();
 </script>
