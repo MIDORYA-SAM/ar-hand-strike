@@ -1,428 +1,393 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#071018">
-<title>AR Hand Strike</title>
+<meta name="theme-color" content="#080609">
+<title>AR HAND STRIKE: NIGHTMARE</title>
 <style>
-*{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#071018;color:white;font-family:system-ui,Arial,sans-serif}
-#video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover}
-#scene{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
-#hud{position:fixed;inset:0;pointer-events:none}
-.top{display:flex;justify-content:space-between;gap:8px;padding:calc(env(safe-area-inset-top) + 12px) 12px 12px}
-.panel{background:#071018d9;border:1px solid #31e9c1;border-radius:12px;padding:9px 12px;font-size:12px;min-width:92px}
-.value{font-size:22px;font-weight:800;color:#49ffd4}
-#status{position:absolute;top:90px;left:12px;right:12px;text-align:center;font-size:12px;color:#d4fff5;text-shadow:0 2px 5px #000}
-#aim{position:absolute;width:30px;height:30px;transform:translate(-50%,-50%);border:2px solid #52ffcf;border-radius:50%;box-shadow:0 0 12px #00ffd0}
-#aim:before,#aim:after{content:"";position:absolute;background:#52ffcf}
-#aim:before{width:44px;height:1px;left:-9px;top:12px}
-#aim:after{width:1px;height:44px;left:12px;top:-9px}
-#aim.hit{border-color:#ff466b;box-shadow:0 0 18px #ff234c}
-#message{position:absolute;top:35%;left:0;right:0;text-align:center;font-size:23px;font-weight:900;color:#62ffdb;text-shadow:0 2px 8px #000}
-.bottom{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 14px);left:0;right:0;display:flex;justify-content:center;gap:10px;padding:10px}
-button{pointer-events:auto;border:1px solid #36f5ca;background:#092923eF;color:white;border-radius:13px;padding:13px 16px;font-weight:800}
-#fire{background:#8e1934ed;border-color:#ff6987}
-#overlay{position:fixed;inset:0;background:#061019f2;display:flex;align-items:center;justify-content:center;padding:24px;z-index:5}
-.card{width:100%;max-width:390px;text-align:center}
-h1{letter-spacing:3px;color:#48ffd1;margin-bottom:6px}
-p,small{line-height:1.5;color:#c4d5dc}
-#startBtn{width:100%;margin-top:14px;background:#087c66}
-#err{color:#ff9eae;font-size:13px;overflow-wrap:anywhere}
-.hidden{display:none!important}
+:root{--red:#ff2448;--dark:#080609;--panel:rgba(10,8,14,.82)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--dark);color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;touch-action:manipulation}
+#app{position:fixed;inset:0;overflow:hidden}
+#camera,#three{position:absolute;inset:0;width:100%;height:100%}
+#camera{object-fit:cover;background:#050507}
+#three{pointer-events:none}
+#vignette{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse,transparent 35%,#0005 75%,#000e 120%);z-index:2}
+#hud{position:absolute;inset:0;z-index:5;pointer-events:none}
+.top{position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:12px;right:12px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.panel{background:var(--panel);border:1px solid #ffffff24;border-radius:13px;padding:9px 11px;backdrop-filter:blur(12px)}
+.brand{font-size:10px;letter-spacing:2px;color:#ff657c;font-weight:900}
+.subtitle{font-size:8px;letter-spacing:1.5px;color:#aaa;margin-top:4px}
+.label{font-size:8px;letter-spacing:1.4px;color:#aaa;text-transform:uppercase}
+.value{font-size:19px;font-weight:950;font-variant-numeric:tabular-nums}
+#wave{color:#ff647d}
+#score{text-align:right}
+#tracking{position:absolute;top:92px;left:12px;font-size:9px;letter-spacing:1px;background:#080609b8;padding:8px 10px;border:1px solid #ffffff20;border-radius:9px}
+#tracking b{color:#ff8292}
+#crosshair{position:absolute;left:50%;top:50%;width:48px;height:48px;border:1px solid #ff8c9a99;border-radius:50%;transform:translate(-50%,-50%);filter:drop-shadow(0 0 6px #ff243f);transition:transform .07s}
+#crosshair:before,#crosshair:after{content:"";position:absolute;background:#ffb6c0}
+#crosshair:before{width:1px;height:62px;left:23px;top:-8px}
+#crosshair:after{height:1px;width:62px;top:23px;left:-8px}
+#crosshair .dot{position:absolute;width:4px;height:4px;left:50%;top:50%;background:#ff243f;border-radius:50%;transform:translate(-50%,-50%)}
+#crosshair.pinching{transform:translate(-50%,-50%) scale(.78);border-color:white}
+#crosshair.hit{border-color:white}
+#boss{display:none;position:absolute;top:calc(env(safe-area-inset-top) + 75px);left:18%;right:18%;text-align:center}
+#boss.visible{display:block}
+#bossLabel{font-size:9px;letter-spacing:3px;color:#ff667d;font-weight:900;margin-bottom:5px}
+.bar{height:6px;background:#ffffff1d;border-radius:8px;overflow:hidden}
+#bossFill{height:100%;width:100%;background:#ff2448;box-shadow:0 0 12px #ff2448}
+#message{position:absolute;top:25%;left:50%;width:90%;transform:translateX(-50%);text-align:center;font-size:clamp(19px,5vw,27px);font-weight:1000;letter-spacing:3px;text-shadow:0 0 20px #f003;opacity:0;transition:opacity .2s}
+#message.show{opacity:1}
+.bottom{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 12px);left:12px;right:12px;display:flex;justify-content:space-between;align-items:flex-end;gap:8px}
+#healthPanel{width:38%;max-width:170px}
+.healthrow{display:flex;justify-content:space-between;font-size:9px;font-weight:800;letter-spacing:1px}
+#healthNum{font-size:11px}
+#healthFill{height:100%;width:100%;background:linear-gradient(90deg,#900b27,#ff344f);transition:width .2s}
+#ammoPanel{text-align:center;min-width:88px}
+#ammo{font-size:24px;font-weight:950;line-height:1}
+#ammo span{font-size:12px;color:#aaa}
+#ammoLabel{font-size:8px;letter-spacing:1.5px;color:#aaa;margin-top:4px}
+button{pointer-events:auto;cursor:pointer;touch-action:manipulation}
+.action{border:1px solid #ffffff30;border-radius:12px;padding:12px 10px;min-height:43px;background:#111019ee;color:#fff;font-size:9px;letter-spacing:1px;font-weight:900}
+#soundBtn{position:absolute;right:12px;top:92px;padding:8px 10px;font-size:9px}
+#flash,#damage{position:absolute;inset:0;z-index:7;pointer-events:none;opacity:0}
+#flash{background:#fff}
+#damage{z-index:8;background:radial-gradient(ellipse,transparent 25%,#ff002eaa 100%)}
+#flash.active{animation:flash .12s}
+#damage.active{animation:damage .35s}
+@keyframes flash{0%{opacity:.65}100%{opacity:0}}
+@keyframes damage{0%{opacity:.9}100%{opacity:0}}
+#toast{position:absolute;z-index:10;top:40%;left:50%;transform:translate(-50%,-50%);background:#100b10ed;border:1px solid #ff435a70;padding:12px 16px;border-radius:12px;font-size:11px;font-weight:900;letter-spacing:2px;opacity:0;transition:opacity .15s;white-space:nowrap;pointer-events:none}
+#toast.show{opacity:1}
+#overlay{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:22px;background:linear-gradient(#030408c9,#030408f2);backdrop-filter:blur(8px)}
+#overlay.hidden{display:none}
+.modal{width:min(430px,100%);border:1px solid #ff334b55;border-radius:22px;padding:23px 20px;background:linear-gradient(145deg,#171019f5,#080a10f7);box-shadow:0 0 50px #a0002530}
+.kicker{font-size:9px;letter-spacing:3px;color:#ff687b;font-weight:900}
+h1{font-size:clamp(28px,8vw,42px);line-height:.98;letter-spacing:-1.5px;margin:12px 0;font-weight:1000}
+h1 em{font-style:normal;color:#ff304a}
+.desc{font-size:12px;line-height:1.6;color:#c3c6d0;margin:13px 0 18px}
+.instructions{display:grid;gap:10px;margin:17px 0 20px}
+.instruction{display:flex;align-items:center;gap:10px;font-size:11px;color:#e5e6ec}
+.icon{width:31px;height:31px;display:grid;place-items:center;flex:none;border:1px solid #ff526544;background:#ff243f12;border-radius:9px;color:#ff8490;font-weight:900}
+.mainBtn{width:100%;border:0;border-radius:13px;padding:16px;background:linear-gradient(100deg,#9d1028,#ff2b48);color:white;font-weight:1000;letter-spacing:1.5px;font-size:11px;box-shadow:0 7px 24px #f13a4a35}
+#note{font-size:10px;line-height:1.5;color:#999eaa;margin-top:12px;text-align:center}
+@media(max-height:650px){.modal{padding:16px}.instructions{gap:6px;margin:10px 0 13px}.bottom{bottom:calc(env(safe-area-inset-bottom) + 7px)}}
 </style>
 </head>
 <body>
-<video id="video" autoplay muted playsinline></video>
-<canvas id="scene"></canvas>
-
+<div id="app">
+<video id="camera" autoplay muted playsinline></video>
+<canvas id="three"></canvas>
+<div id="vignette"></div>
+<div id="flash"></div><div id="damage"></div><div id="toast"></div>
 <div id="hud">
   <div class="top">
-    <div class="panel">AR HAND STRIKE<br><span id="ammo" class="value">30</span> munições</div>
-    <div class="panel">PONTUAÇÃO<br><span id="score" class="value">0</span></div>
+    <div class="panel"><div class="brand">AR HAND STRIKE</div><div class="subtitle">NIGHTMARE PROTOCOL</div></div>
+    <div class="panel"><div class="label">ONDA</div><div class="value" id="wave">01</div></div>
+    <div class="panel" id="score"><div class="label">ABATES</div><div class="value" id="scoreValue">0000</div></div>
   </div>
-  <div id="status">Aguardando câmera</div>
-  <div id="aim" class="hidden"></div>
-  <div id="message">TOQUE EM INICIAR</div>
+  <div id="tracking">RASTREAMENTO: <b id="trackingText">AGUARDANDO</b></div>
+  <button class="action" id="soundBtn">ÁUDIO: OFF</button>
+  <div id="boss"><div id="bossLabel">ENTIDADE ALFA</div><div class="bar"><div id="bossFill"></div></div></div>
+  <div id="message"></div>
+  <div id="crosshair"><div class="dot"></div></div>
   <div class="bottom">
-    <button id="reload">RECARREGAR</button>
-    <button id="fire">DISPARO MANUAL</button>
-    <button id="reset">REINICIAR</button>
+    <div class="panel" id="healthPanel"><div class="healthrow"><span>INTEGRIDADE</span><span id="healthNum">100%</span></div><div class="bar" style="margin-top:7px"><div id="healthFill"></div></div></div>
+    <div class="panel" id="ammoPanel"><div id="ammo">12<span> / 12</span></div><div id="ammoLabel">CARGAS</div></div>
+    <button class="action" id="reloadBtn">RECARREGAR ↻</button>
   </div>
 </div>
-
 <div id="overlay">
- <div class="card">
-  <h1>AR HAND STRIKE</h1>
-  <p>FPS de realidade aumentada controlado pelas mãos.</p>
-  <p><small>Permita a câmera traseira. Mantenha a mão visível na imagem e junte polegar e indicador para disparar. Use apenas em local seguro.</small></p>
-  <button id="startBtn">ATIVAR CÂMERA E JOGAR</button>
-  <p id="err"></p>
-  <small>Necessita internet para carregar o motor 3D e o modelo de IA.</small>
- </div>
+  <div class="modal">
+    <div class="kicker" id="kicker">SINAL PERDIDO // SETOR 09</div>
+    <h1 id="title">AR HAND STRIKE<br><em>NIGHTMARE</em></h1>
+    <p class="desc" id="description">Algo atravessou a escuridão. Levante a mão diante da câmera e sobreviva às ondas. Não deixe as criaturas chegarem perto demais.</p>
+    <div class="instructions">
+      <div class="instruction"><div class="icon">◎</div><div><b>MIRA</b> — mova a ponta do indicador.</div></div>
+      <div class="instruction"><div class="icon">⌁</div><div><b>DISPARO</b> — junte polegar e indicador.</div></div>
+      <div class="instruction"><div class="icon">↻</div><div><b>RECARGA</b> — toque no botão inferior direito.</div></div>
+    </div>
+    <button class="mainBtn" id="startBtn">INICIAR SOBREVIVÊNCIA</button>
+    <div id="note">Requer HTTPS, acesso à câmera e conexão para carregar o modelo MediaPipe. Mantenha sua mão visível no enquadramento.</div>
+  </div>
 </div>
-
+</div>
 <script type="module">
-import * as THREE from
-'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
+import {FilesetResolver,HandLandmarker} from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
 
-const $ = id => document.getElementById(id);
-const video = $('video');
-const canvas = $('scene');
-const aim = $('aim');
-const statusEl = $('status');
-const message = $('message');
-const overlay = $('overlay');
+const $=id=>document.getElementById(id);
+const video=$('camera'),canvas=$('three'),overlay=$('overlay');
+let renderer,scene,camera3D,landmarker,stream,audioCtx,audioOn=false;
+let started=false,gameOver=false,tracking=false,reloading=false,lastVideoTime=-1,lastPinch=false,lastShot=0,lastDamage=0;
+let health=100,ammo=12,maxAmmo=12,score=0,wave=1,aimX=.5,aimY=.5,enemyId=0,frame=0;
+let enemies=[],effects=[],centerTimer,toastTimer;
+const clock=new THREE.Clock(),raycaster=new THREE.Raycaster();
+const enemyGroup=new THREE.Group();
+const M=(c,r=.8,m=0,e=0,i=0)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m,emissive:e,emissiveIntensity:i});
+const materials={
+ flesh:M(0x252027),dark:M(0x09090e),bone:M(0x918588),red:M(0x9b1028,.4,.1,0x600014,1.6),
+ eyes:new THREE.MeshBasicMaterial({color:0xff153b}),claw:M(0x171319,.5,.1),pale:M(0xb0a1a3,.8,0,0x260008,.4)
+};
 
-let stream, handLandmarker, scene, camera, renderer;
-let targets = [];
-let score = 0, ammo = 30;
-let running = false, busy = false;
-let lastVideoTime = -1, pinching = false, lastShot = 0;
-let aimX = innerWidth / 2, aimY = innerHeight / 2;
-let aimVisible = false;
-let lastFrame = 0;
-
-const clock = new THREE.Clock();
-const raycaster = new THREE.Raycaster();
-const ndc = new THREE.Vector2();
-
-function updateHUD(){
-  $('score').textContent = score;
-  $('ammo').textContent = ammo;
+function init3D(){
+ scene=new THREE.Scene();
+ camera3D=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,100);
+ camera3D.position.set(0,0,0);
+ renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:false,powerPreference:'low-power'});
+ renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));
+ renderer.setSize(innerWidth,innerHeight,false);
+ renderer.outputColorSpace=THREE.SRGBColorSpace;
+ renderer.toneMapping=THREE.ACESFilmicToneMapping;
+ renderer.toneMappingExposure=1.25;
+ scene.add(new THREE.HemisphereLight(0x8290b0,0x12050a,1.4));
+ const redLight=new THREE.PointLight(0xff123b,7,18);redLight.position.set(0,1,-4);scene.add(redLight);
+ const coldLight=new THREE.PointLight(0x526d9a,4,16);coldLight.position.set(-4,2,-6);scene.add(coldLight);
+ scene.add(enemyGroup);
+ addEventListener('resize',resize);
+ animate();
 }
-
 function resize(){
-  if(!camera || !renderer) return;
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
+ if(!renderer)return;
+ renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));
+ renderer.setSize(innerWidth,innerHeight,false);
+ camera3D.aspect=innerWidth/innerHeight;camera3D.updateProjectionMatrix();
 }
-addEventListener('resize', resize);
-
-function makeEnemy(x,y,z){
-  const group = new THREE.Group();
-
-  const armor = new THREE.MeshStandardMaterial({
-    color:0x273747, metalness:.7, roughness:.3
-  });
-  const red = new THREE.MeshStandardMaterial({
-    color:0xe42d50, emissive:0x4a0010, metalness:.3
-  });
-  const eyeMat = new THREE.MeshBasicMaterial({color:0x55ffe1});
-
-  function part(geo,mat,px,py,pz){
-    const mesh = new THREE.Mesh(geo,mat);
-    mesh.position.set(px,py,pz);
-    group.add(mesh);
-    return mesh;
-  }
-
-  part(new THREE.BoxGeometry(.62,.72,.36),red,0,0,0);
-  part(new THREE.SphereGeometry(.25,16,12),armor,0,.53,0);
-  part(new THREE.BoxGeometry(.12,.07,.035),eyeMat,-.10,.56,-.23);
-  part(new THREE.BoxGeometry(.12,.07,.035),eyeMat,.10,.56,-.23);
-  part(new THREE.BoxGeometry(.17,.43,.18),armor,-.39,-.12,0);
-  part(new THREE.BoxGeometry(.17,.43,.18),armor,.39,-.12,0);
-  part(new THREE.BoxGeometry(.19,.42,.2),armor,-.19,-.55,0);
-  part(new THREE.BoxGeometry(.19,.42,.2),armor,.19,-.55,0);
-
-  group.position.set(x,y,z);
-  group.userData.phase = Math.random()*6;
-  group.userData.alive = true;
-  scene.add(group);
-  targets.push(group);
+function creature(boss=false){
+ const g=new THREE.Group(),scale=boss?1.55:1;
+ g.scale.setScalar(scale);
+ const torso=new THREE.Mesh(new THREE.IcosahedronGeometry(.42,1),boss?materials.pale:materials.flesh);
+ torso.scale.set(.85,1.2,.55);torso.position.y=.05;g.add(torso);
+ const head=new THREE.Group();head.position.set(0,.68,0);g.add(head);
+ const skull=new THREE.Mesh(new THREE.SphereGeometry(.31,12,10),boss?materials.bone:materials.pale);
+ skull.scale.set(.8,1.15,.78);head.add(skull);
+ const jaw=new THREE.Mesh(new THREE.BoxGeometry(.34,.17,.27),materials.dark);jaw.position.set(0,-.22,.11);head.add(jaw);
+ for(const side of [-1,1]){
+  const socket=new THREE.Mesh(new THREE.SphereGeometry(.09,8,8),materials.dark);socket.position.set(side*.12,.04,.23);head.add(socket);
+  const eye=new THREE.Mesh(new THREE.SphereGeometry(boss?.075:.052,8,8),materials.eyes);eye.position.set(side*.12,.04,.3);head.add(eye);
+  const glow=new THREE.PointLight(0xff1038,boss?1.5:.6,2);glow.position.copy(eye.position);head.add(glow);
+  const arm=new THREE.Group();arm.position.set(side*.35,.25,0);g.add(arm);
+  const upper=new THREE.Mesh(new THREE.CylinderGeometry(.075,.11,.48,7),materials.flesh);upper.position.set(side*.04,-.22,0);arm.add(upper);
+  const fore=new THREE.Mesh(new THREE.CylinderGeometry(.04,.075,.42,7),materials.dark);fore.position.set(side*.1,-.61,.03);arm.add(fore);
+  const claw=new THREE.Mesh(new THREE.ConeGeometry(.055,.24,6),materials.claw);claw.position.set(side*.12,-.91,.08);claw.rotation.x=Math.PI;arm.add(claw);
+  g.userData[side<0?'leftArm':'rightArm']=arm;
+ }
+ const ribs=new THREE.Mesh(new THREE.TorusGeometry(.25,.035,5,10),materials.red);ribs.position.set(0,.05,.22);ribs.rotation.x=Math.PI/2;g.add(ribs);
+ for(let i=0;i<3;i++){const spike=new THREE.Mesh(new THREE.ConeGeometry(.07,.28,5),materials.claw);spike.position.set((i-1)*.19,.45,-.05);g.add(spike);}
+ g.userData.head=head;g.userData.phase=Math.random()*6.28;
+ g.userData.hp=boss?9:(wave>=4?3:2);g.userData.boss=boss;
+ g.userData.speed=(boss?.16:.23)+Math.min(wave*.018,.16);
+ g.userData.baseY=(Math.random()-.5)*2.7;
+ g.position.set((Math.random()-.5)*4.7,g.userData.baseY,-(boss?8.5:7.5+Math.random()*3));
+ g.userData.id=++enemyId;enemyGroup.add(g);enemies.push(g);
+ if(boss){$('boss').classList.add('visible');$('bossFill').style.width='100%';$('bossLabel').textContent='ENTIDADE ALFA // CHEFE';toast('A ENTIDADE ALFA DESPERTOU');}
 }
-
 function spawnWave(){
-  for(const t of targets) scene.remove(t);
-  targets = [];
-
-  for(let i=0;i<5;i++){
-    makeEnemy((Math.random()-.5)*4.4,
-              (Math.random()-.5)*1.8,
-              -4.5-Math.random()*3.5);
-  }
-  message.textContent = '5 ALVOS — ENCONTRE-OS';
+ if(gameOver)return;
+ const boss=wave%5===0;
+ message(boss?'ALGO ANTIGO DESPERTOU':`ONDA ${String(wave).padStart(2,'0')}`);
+ creature(boss);
+ const amount=boss?0:Math.min(2+Math.floor(wave/2),5);
+ for(let i=0;i<amount;i++)setTimeout(()=>{if(started&&!gameOver)creature(false)},850+i*950);
 }
-
-function setup3D(){
-  scene = new THREE.Scene();
-
-  camera = new THREE.PerspectiveCamera(
-    70, innerWidth/innerHeight, .1, 60
-  );
-  camera.position.set(0,0,0);
-
-  renderer = new THREE.WebGLRenderer({
-    canvas, alpha:true, antialias:true
-  });
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1,1.5));
-  renderer.setSize(innerWidth,innerHeight);
-  renderer.setClearColor(0x000000,0);
-
-  scene.add(new THREE.HemisphereLight(0xffffff,0x263044,2));
-  const light = new THREE.DirectionalLight(0xffffff,2);
-  light.position.set(2,5,4);
-  scene.add(light);
-
-  spawnWave();
+function message(s){$('message').textContent=s;$('message').classList.add('show');clearTimeout(centerTimer);centerTimer=setTimeout(()=>$('message').classList.remove('show'),1500)}
+function toast(s){$('toast').textContent=s;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),900)}
+function hud(){
+ $('healthNum').textContent=Math.max(0,Math.round(health))+'%';
+ $('healthFill').style.width=Math.max(0,health)+'%';
+ $('ammo').innerHTML=`${ammo}<span> / ${maxAmmo}</span>`;
+ $('scoreValue').textContent=String(score).padStart(4,'0');
+ $('wave').textContent=String(wave).padStart(2,'0');
 }
-
-function screenToNDC(x,y){
-  return new THREE.Vector2(
-    (x / innerWidth) * 2 - 1,
-    -(y / innerHeight) * 2 + 1
-  );
+function initAudio(){
+ try{audioCtx=new(window.AudioContext||window.webkitAudioContext)();audioOn=true;$('soundBtn').textContent='ÁUDIO: ON';audioCtx.resume()}catch(e){audioOn=false}
 }
-
-/*
- * Converte as coordenadas da imagem do MediaPipe para a tela.
- * Corrige o recorte produzido por object-fit: cover.
- */
-function landmarkToScreen(lm){
-  const vw = video.videoWidth;
-  const vh = video.videoHeight;
-  if(!vw || !vh) return null;
-
-  const scale = Math.max(innerWidth/vw,innerHeight/vh);
-  const shownW = vw*scale;
-  const shownH = vh*scale;
-  const offsetX = (shownW-innerWidth)/2;
-  const offsetY = (shownH-innerHeight)/2;
-
-  return {
-    x: lm.x*shownW-offsetX,
-    y: lm.y*shownH-offsetY
-  };
+function tone(freq,duration,type='sawtooth',volume=.04,slide=0){
+ if(!audioOn||!audioCtx)return;
+ try{
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain(),now=audioCtx.currentTime;
+  o.type=type;o.frequency.setValueAtTime(freq,now);
+  if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(20,freq+slide),now+duration);
+  g.gain.setValueAtTime(volume,now);g.gain.exponentialRampToValueAtTime(.001,now+duration);
+  o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(now+duration+.02);
+ }catch(e){}
 }
-
+function noise(duration=.09,volume=.05){
+ if(!audioOn||!audioCtx)return;
+ try{
+  const n=Math.floor(audioCtx.sampleRate*duration),b=audioCtx.createBuffer(1,n,audioCtx.sampleRate),d=b.getChannelData(0);
+  for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);
+  const s=audioCtx.createBufferSource(),g=audioCtx.createGain();s.buffer=b;g.gain.value=volume;s.connect(g);g.connect(audioCtx.destination);s.start();
+ }catch(e){}
+}
+function effectAt(point,color=0xff304b,count=7){
+ for(let i=0;i<count;i++){
+  const mesh=new THREE.Mesh(new THREE.SphereGeometry(.025+Math.random()*.025,5,5),new THREE.MeshBasicMaterial({color,transparent:true}));
+  mesh.position.copy(point);scene.add(mesh);
+  effects.push({mesh,life:.3+Math.random()*.3,max:.6,vel:new THREE.Vector3((Math.random()-.5)*2,(Math.random()-.5)*2,(Math.random()-.5)*2)});
+ }
+}
+function muzzle(){
+ const p=new THREE.Mesh(new THREE.SphereGeometry(.1,7,7),new THREE.MeshBasicMaterial({color:0xffa0aa,transparent:true,opacity:.9}));
+ p.position.set((aimX-.5)*.2,(.5-aimY)*.2,-.5);scene.add(p);
+ effects.push({mesh:p,life:.12,max:.12,vel:new THREE.Vector3()});
+ for(let i=0;i<4;i++){
+  const m=new THREE.Mesh(new THREE.SphereGeometry(.025,5,5),new THREE.MeshBasicMaterial({color:0xff334c}));
+  m.position.copy(p.position);scene.add(m);effects.push({mesh:m,life:.2,max:.2,vel:new THREE.Vector3((Math.random()-.5)*2,(Math.random()-.5)*2,-Math.random()*2)});
+ }
+}
 function shoot(){
-  if(!running || ammo<=0){
-    if(running) message.textContent='SEM MUNIÇÃO';
-    return;
+ if(!started||gameOver||reloading)return;
+ const now=performance.now();if(now-lastShot<280)return;lastShot=now;
+ if(ammo<=0){tone(90,.08,'square',.025);toast('SEM CARGAS — RECARREGUE');return}
+ ammo--;hud();tone(155,.1,'sawtooth',.07,-100);noise(.07,.045);muzzle();
+ $('flash').classList.remove('active');void $('flash').offsetWidth;$('flash').classList.add('active');
+ $('crosshair').classList.add('pinching');setTimeout(()=>$('crosshair').classList.remove('pinching'),100);
+ raycaster.setFromCamera(new THREE.Vector2(aimX*2-1,1-aimY*2),camera3D);
+ const targets=[];for(const e of enemies)e.traverse(o=>{if(o.isMesh)targets.push(o)});
+ const hits=raycaster.intersectObjects(targets,false);
+ if(hits.length){
+  let target=hits[0].object;while(target.parent&&target.parent!==enemyGroup)target=target.parent;
+  if(target.parent===enemyGroup){
+   target.userData.hp--;score+=100;effectAt(hits[0].point);
+   toast(target.userData.hp<=0?'CRIATURA ELIMINADA +100':'ACERTO +100');
+   tone(target.userData.hp<=0?65:240,.16,'triangle',.07,-70);
+   if(target.userData.boss)$('bossFill').style.width=Math.max(0,target.userData.hp/9*100)+'%';
+   if(target.userData.hp<=0)kill(target);
+   hud();
   }
-
-  ammo--;
-  updateHUD();
-
-  ndc.copy(screenToNDC(aimX,aimY));
-  raycaster.setFromCamera(ndc,camera);
-
-  const hits = raycaster.intersectObjects(
-    targets.flatMap(t=>t.children),true
-  );
-
-  if(hits.length){
-    let obj = hits[0].object;
-    while(obj.parent && !targets.includes(obj)){
-      obj=obj.parent;
-    }
-
-    if(targets.includes(obj)){
-      scene.remove(obj);
-      targets=targets.filter(t=>t!==obj);
-      score+=100;
-      updateHUD();
-      aim.classList.add('hit');
-      message.textContent='ALVO ATINGIDO +100';
-
-      setTimeout(()=>aim.classList.remove('hit'),180);
-
-      if(targets.length===0){
-        message.textContent='FASE CONCLUÍDA!';
-        setTimeout(()=>{
-          if(running) spawnWave();
-        },1200);
-      }
-      return;
-    }
-  }
-  message.textContent='DISPARO';
+ }
 }
-
-/* MediaPipe: detecta a mão e reconhece a pinça entre os dedos 4 e 8. */
-async function initHands(){
-  const vision = await import(
-    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14'
-  );
-
-  const files = await vision.FilesetResolver.forVisionTasks(
-    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
-  );
-
-  const modelURL =
-    'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
-
-  const options = {
-    baseOptions:{
-      modelAssetPath:modelURL,
-      delegate:'GPU'
-    },
-    runningMode:'VIDEO',
-    numHands:1,
-    minHandDetectionConfidence:.55,
-    minHandPresenceConfidence:.55,
-    minTrackingConfidence:.5
-  };
-
+function kill(e){
+ const idx=enemies.indexOf(e);if(idx>=0)enemies.splice(idx,1);
+ for(let i=0;i<13;i++){
+  const mesh=new THREE.Mesh(new THREE.IcosahedronGeometry(.04+Math.random()*.05,0),new THREE.MeshBasicMaterial({color:[0x5c071b,0xff233f,0x181018][i%3],transparent:true}));
+  mesh.position.copy(e.position).add(new THREE.Vector3((Math.random()-.5)*.7,(Math.random()-.5)*.8,0));scene.add(mesh);
+  effects.push({mesh,life:.7+Math.random()*.4,max:1.1,vel:new THREE.Vector3((Math.random()-.5)*2,Math.random()*2,(Math.random()-.5)*1.5)});
+ }
+ enemyGroup.remove(e);dispose(e);
+ if(e.userData.boss){$('boss').classList.remove('visible');health=Math.min(100,health+20);message('A ENTIDADE FOI SILENCIADA')}
+ if(enemies.length===0){wave++;health=Math.min(100,health+8);ammo=maxAmmo;hud();setTimeout(()=>{if(started&&!gameOver)spawnWave()},1600)}
+}
+function dispose(o){o.traverse(x=>{if(x.geometry)x.geometry.dispose()})}
+function reload(){
+ if(!started||gameOver||reloading||ammo===maxAmmo)return;
+ reloading=true;toast('RECARREGANDO...');tone(280,.07,'square',.025,-90);
+ setTimeout(()=>{if(!gameOver){ammo=maxAmmo;hud();tone(430,.1,'triangle',.04,100);toast('ARMA PRONTA')}reloading=false},1050);
+}
+function damagePlayer(){
+ const now=performance.now();if(now-lastDamage<850)return;lastDamage=now;
+ health-=12;hud();
+ $('damage').classList.remove('active');void $('damage').offsetWidth;$('damage').classList.add('active');
+ tone(55,.24,'sawtooth',.08,-25);
+ if(navigator.vibrate)navigator.vibrate(90);
+ if(health<=0)endGame();
+}
+function endGame(){
+ gameOver=true;started=false;$('boss').classList.remove('visible');
+ overlay.classList.remove('hidden');
+ $('kicker').textContent='SINAL ENCERRADO // VOCÊ CAIU';
+ $('title').innerHTML='FIM DE<br><em>JOGO</em>';
+ $('description').textContent=`Você chegou à onda ${wave} e eliminou ${score/100} criaturas. A escuridão venceu desta vez.`;
+ $('startBtn').textContent='TENTAR NOVAMENTE';
+ $('note').textContent='Toque para reiniciar a sobrevivência.';
+}
+function updateEnemies(dt){
+ for(const e of [...enemies]){
+  e.userData.phase+=dt*2;
+  e.position.y=e.userData.baseY+Math.sin(e.userData.phase)*.13;
+  e.rotation.y=Math.sin(e.userData.phase*.7)*.13;
+  e.userData.head.rotation.x=Math.sin(e.userData.phase*1.3)*.08;
+  if(e.userData.leftArm)e.userData.leftArm.rotation.x=Math.sin(e.userData.phase*1.5)*.16;
+  if(e.userData.rightArm)e.userData.rightArm.rotation.x=-Math.sin(e.userData.phase*1.5)*.16;
+  e.position.z+=e.userData.speed*dt;
+  if(e.position.z>-1.2){
+   damagePlayer();enemyGroup.remove(e);enemies.splice(enemies.indexOf(e),1);dispose(e);
+   if(enemies.length===0&&!gameOver){wave++;hud();setTimeout(()=>{if(started&&!gameOver)spawnWave()},1300)}
+  }
+ }
+}
+function updateEffects(dt){
+ for(let i=effects.length-1;i>=0;i--){
+  const e=effects[i];e.life-=dt;
+  e.mesh.position.addScaledVector(e.vel,dt);e.vel.y-=dt*1.4;
+  if(e.mesh.material&&'opacity'in e.mesh.material)e.mesh.material.opacity=Math.max(0,e.life/e.max);
+  if(e.life<=0){scene.remove(e.mesh);e.mesh.geometry?.dispose();e.mesh.material?.dispose();effects.splice(i,1)}
+ }
+}
+function animate(){
+ requestAnimationFrame(animate);if(!renderer)return;
+ const dt=Math.min(clock.getDelta(),.04);
+ if(started&&!gameOver)updateEnemies(dt);
+ updateEffects(dt);
+ if(frame++%2===0)renderer.render(scene,camera3D);
+}
+async function setupTracking(){
+ const vision=await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+ landmarker=await HandLandmarker.createFromOptions(vision,{
+  baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',delegate:'GPU'},
+  runningMode:'VIDEO',numHands:1,minHandDetectionConfidence:.55,minHandPresenceConfidence:.5,minTrackingConfidence:.5
+ });
+ trackingLoop();
+}
+function trackingLoop(){
+ if(video.readyState>=2&&landmarker&&video.currentTime!==lastVideoTime){
+  lastVideoTime=video.currentTime;
   try{
-    handLandmarker = await vision.HandLandmarker.createFromOptions(files,options);
-  }catch(gpuError){
-    options.baseOptions.delegate='CPU';
-    handLandmarker = await vision.HandLandmarker.createFromOptions(files,options);
-  }
+   const result=landmarker.detectForVideo(video,performance.now());
+   if(result.landmarks?.length){
+    tracking=true;
+    const lm=result.landmarks[0],tip=lm[8],thumb=lm[4];
+    aimX=THREE.MathUtils.clamp(1-tip.x,.04,.96);
+    aimY=THREE.MathUtils.clamp(tip.y,.06,.94);
+    $('trackingText').textContent='MÃO DETECTADA';$('trackingText').style.color='#8cffc5';
+    const pinch=Math.hypot(tip.x-thumb.x,tip.y-thumb.y)<.048;
+    if(pinch&&!lastPinch&&started)shoot();
+    lastPinch=pinch;
+    $('crosshair').style.left=aimX*100+'%';$('crosshair').style.top=aimY*100+'%';
+    $('crosshair').classList.toggle('pinching',pinch);
+   }else{
+    tracking=false;lastPinch=false;
+    $('trackingText').textContent='MOSTRE SUA MÃO';$('trackingText').style.color='#ff8b98';
+   }
+  }catch(e){$('trackingText').textContent='RASTREAMENTO...'}
+ }
+ requestAnimationFrame(trackingLoop);
 }
-
-function processHands(now){
-  if(!handLandmarker || video.readyState<2) return;
-
-  if(video.currentTime!==lastVideoTime){
-    lastVideoTime=video.currentTime;
-
-    const result=handLandmarker.detectForVideo(video,now);
-    const hand=result.landmarks?.[0];
-
-    if(!hand){
-      aimVisible=false;
-      aim.classList.add('hidden');
-      pinching=false;
-      statusEl.textContent='Mostre sua mão à câmera';
-      return;
-    }
-
-    /*
-     * 8 = ponta do indicador.
-     * 4 = ponta do polegar.
-     */
-    const index=landmarkToScreen(hand[8]);
-    const thumb=landmarkToScreen(hand[4]);
-
-    if(!index || !thumb) return;
-
-    aimX=index.x;
-    aimY=index.y;
-    aimVisible=true;
-    aim.style.left=aimX+'px';
-    aim.style.top=aimY+'px';
-    aim.classList.remove('hidden');
-
-    const dx=(thumb.x-index.x)/innerWidth;
-    const dy=(thumb.y-index.y)/innerHeight;
-    const distance=Math.hypot(dx,dy);
-
-    // Limite ajustável para o gesto de pinça.
-    const isPinching=distance<0.045;
-
-    if(isPinching && !pinching && now-lastShot>350){
-      lastShot=now;
-      shoot();
-    }
-
-    pinching=isPinching;
-    statusEl.textContent=isPinching
-      ? 'PINÇA DETECTADA — DISPARO'
-      : 'Mão detectada — mire com o indicador';
+async function startGame(){
+ $('startBtn').disabled=true;$('startBtn').textContent='INICIALIZANDO...';
+ try{
+  if(!renderer)init3D();
+  if(!stream){
+   stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30,max:30}}});
+   video.srcObject=stream;await video.play();
   }
+  if(!landmarker)await setupTracking();
+  if(!audioCtx)initAudio();else if(audioCtx.state==='suspended')await audioCtx.resume();
+  for(const e of enemies){enemyGroup.remove(e);dispose(e)}enemies=[];
+  for(const e of effects){scene.remove(e.mesh)}effects=[];
+  health=100;ammo=maxAmmo;score=0;wave=1;gameOver=false;started=true;reloading=false;
+  $('boss').classList.remove('visible');overlay.classList.add('hidden');
+  $('kicker').textContent='SINAL PERDIDO // SETOR 09';
+  $('title').innerHTML='AR HAND STRIKE<br><em>NIGHTMARE</em>';
+  hud();spawnWave();tone(80,.5,'sawtooth',.04,180);
+ }catch(err){
+  console.error(err);$('startBtn').disabled=false;$('startBtn').textContent='TENTAR NOVAMENTE';
+  $('note').textContent='Falha ao iniciar. Abra a página por HTTPS no Safari, permita a câmera e confira a conexão. '+(err?.message||err);
+ }finally{
+  $('startBtn').disabled=false;
+  if(!gameOver)$('startBtn').textContent='INICIAR SOBREVIVÊNCIA';
+ }
 }
-
-function animate(now){
-  if(!running) return;
-  requestAnimationFrame(animate);
-
-  // Limita o processamento do modelo a aproximadamente 24 FPS.
-  if(now-lastFrame>40){
-    lastFrame=now;
-    try{
-      processHands(now);
-    }catch(e){
-      statusEl.textContent='Erro no rastreamento da mão';
-      console.error(e);
-    }
-  }
-
-  const t=clock.getElapsedTime();
-  for(const e of targets){
-    e.position.y += Math.sin(t*2+e.userData.phase)*.0015;
-    e.rotation.y = Math.sin(t+e.userData.phase)*.12;
-  }
-  renderer.render(scene,camera);
-}
-
-$('startBtn').onclick=async()=>{
-  if(busy) return;
-  busy=true;
-  $('startBtn').disabled=true;
-  $('err').textContent='Abrindo câmera e carregando IA...';
-
-  try{
-    if(!navigator.mediaDevices?.getUserMedia){
-      throw new Error('Abra o jogo por um endereço HTTPS no Safari.');
-    }
-
-    stream=await navigator.mediaDevices.getUserMedia({
-      audio:false,
-      video:{
-        facingMode:{ideal:'environment'},
-        width:{ideal:1280},
-        height:{ideal:720}
-      }
-    });
-
-    video.srcObject=stream;
-    await video.play();
-
-    statusEl.textContent='Carregando rastreamento de mãos...';
-    await initHands();
-
-    setup3D();
-    resize();
-
-    score=0;
-    ammo=30;
-    updateHUD();
-
-    running=true;
-    clock.start();
-    overlay.classList.add('hidden');
-    message.textContent='MIRE COM O INDICADOR';
-    requestAnimationFrame(animate);
-  }catch(e){
-    $('err').textContent='Não foi possível iniciar: '+e.message+
-      '. Confira HTTPS, permissões e conexão com a internet.';
-    if(stream){
-      stream.getTracks().forEach(t=>t.stop());
-      stream=null;
-    }
-    video.srcObject=null;
-  }finally{
-    busy=false;
-    $('startBtn').disabled=false;
-  }
-};
-
-$('fire').onclick=shoot;
-$('reload').onclick=()=>{
-  ammo=30;
-  updateHUD();
-  message.textContent='MUNIÇÃO RECARREGADA';
-};
-$('reset').onclick=()=>{
-  if(!running)return;
-  score=0;
-  ammo=30;
-  updateHUD();
-  spawnWave();
-};
-
-document.addEventListener('visibilitychange',()=>{
-  if(document.hidden && stream){
-    statusEl.textContent='Jogo pausado ao sair da tela';
-  }
+$('startBtn').addEventListener('click',startGame);
+$('reloadBtn').addEventListener('click',reload);
+$('soundBtn').addEventListener('click',()=>{
+ if(!audioCtx)initAudio();
+ else{audioOn=!audioOn;$('soundBtn').textContent=audioOn?'ÁUDIO: ON':'ÁUDIO: OFF';if(audioOn&&audioCtx.state==='suspended')audioCtx.resume()}
 });
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&audioCtx?.state==='running')audioCtx.suspend()});
+if(!navigator.mediaDevices?.getUserMedia)$('note').textContent='Este navegador não oferece acesso à câmera. Abra o jogo por HTTPS no Safari atualizado.';
 </script>
 </body>
 </html>
