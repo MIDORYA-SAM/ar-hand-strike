@@ -1,31 +1,24 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>AR HAND STRIKE: NIGHTMARE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>VR Mobile Passthrough & Hand Tracking Prototype</title>
+    
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Three.js -->
+    <!-- Three.js para renderização 3D -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
-    <!-- Three.js WebXR VRButton -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/webxr/VRButton.js"></script>
+    <!-- MediaPipe Hands & Camera Utils -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
-    <!-- MediaPipe Vision Tasks -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.js" crossorigin="anonymous"></script>
+    <!-- FontAwesome para Ícones -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
-        * {
-            user-select: none;
-            -webkit-user-select: none;
-            touch-action: manipulation;
-            -webkit-touch-callout: none;
-        }
-
         body, html {
             margin: 0;
             padding: 0;
@@ -33,1372 +26,589 @@
             height: 100%;
             overflow: hidden;
             background-color: #000;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            color: #fff;
+            font-family: system-ui, -apple-system, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
-        /* Safe area support for iOS Notch / Dynamic Island */
-        .safe-area-top { padding-top: max(1rem, env(safe-area-inset-top)); }
-        .safe-area-bottom { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
-        .safe-area-left { padding-left: max(1rem, env(safe-area-inset-left)); }
-        .safe-area-right { padding-right: max(1rem, env(safe-area-inset-right)); }
+        #webcam-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 1px;
+            height: 1px;
+            opacity: 0.01;
+            pointer-events: none;
+        }
 
-        #camera-video {
+        .vr-viewport {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            object-fit: cover;
-            z-index: 1;
-            transform: scaleX(1); /* Rear camera doesn't need mirroring */
+            display: flex;
         }
 
-        #three-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
+        .eye-view {
+            position: relative;
+            flex: 1;
             height: 100%;
-            z-index: 2;
-            pointer-events: none;
+            overflow: hidden;
         }
 
-        /* Horror Vignette and FX Overlays */
-        .vignette {
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-            z-index: 3;
-            background: radial-gradient(circle, transparent 50%, rgba(0, 0, 0, 0.85) 90%, rgba(15, 0, 0, 0.98) 100%);
+        .split-vr .eye-view {
+            border-right: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .split-vr .eye-view:last-child {
+            border-right: none;
         }
 
-        .damage-flash {
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-            z-index: 4;
-            background: radial-gradient(circle, rgba(220, 38, 38, 0.2) 0%, rgba(185, 28, 28, 0.8) 100%);
-            opacity: 0;
-            transition: opacity 0.15s ease-out;
-        }
-
-        /* Reticle UI */
-        #reticle {
-            position: absolute;
-            width: 50px;
-            height: 50px;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            z-index: 10;
-            display: none;
-            transition: transform 0.05s linear;
-        }
-
-        .reticle-ring {
-            width: 100%;
-            height: 100%;
-            border: 2px dashed #ef4444;
-            border-radius: 50%;
-            animation: spin 8s linear infinite;
-        }
-
-        .reticle-dot {
+        .reticle {
             position: absolute;
             top: 50%;
             left: 50%;
+            transform: translate(-50%, -50%);
             width: 8px;
             height: 8px;
-            background-color: #ef4444;
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 2px solid rgba(0, 0, 0, 0.5);
             border-radius: 50%;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 0 10px #ef4444, 0 0 20px #ef4444;
-        }
-
-        .reticle-pinch {
-            border-color: #22c55e !important;
-            transform: scale(0.8);
-        }
-
-        .reticle-pinch .reticle-dot {
-            background-color: #22c55e !important;
-            box-shadow: 0 0 12px #22c55e, 0 0 25px #22c55e !important;
-        }
-
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-
-        /* Scanline Horror FX */
-        .scanlines {
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
-            background-size: 100% 4px;
-            z-index: 3;
             pointer-events: none;
-            opacity: 0.6;
-        }
-
-        .glow-red {
-            text-shadow: 0 0 10px rgba(239, 68, 68, 0.8), 0 0 20px rgba(185, 28, 28, 0.6);
-        }
-
-        /* Glassmorphism Panels */
-        .glass-panel {
-            background: rgba(12, 10, 15, 0.75);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(239, 68, 68, 0.2);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+            z-index: 10;
         }
     </style>
 </head>
-<body>
+<body class="bg-black text-white select-none">
 
-    <!-- Camera Background -->
-    <video id="camera-video" autoplay playsinline muted></video>
+    <!-- Elemento de Vídeo com todos os atributos obrigatórios para iOS/Android -->
+    <video id="webcam-video" playsinline webkit-playsinline muted autoplay></video>
 
-    <!-- 3D Three.js Overlay -->
-    <canvas id="three-canvas"></canvas>
+    <!-- Viewport VR / AR -->
+    <div id="app-container" class="vr-viewport split-vr">
+        <div id="left-eye" class="eye-view">
+            <canvas id="canvas-left" class="w-full h-full block"></canvas>
+            <div class="reticle"></div>
+        </div>
 
-    <!-- Atmosphere Filters -->
-    <div class="vignette"></div>
-    <div class="scanlines"></div>
-    <div id="damage-flash" class="damage-flash"></div>
-
-    <!-- Dynamic Tracking Reticle -->
-    <div id="reticle">
-        <div class="reticle-ring" id="reticle-ring"></div>
-        <div class="reticle-dot"></div>
+        <div id="right-eye" class="eye-view">
+            <canvas id="canvas-right" class="w-full h-full block"></canvas>
+            <div class="reticle"></div>
+        </div>
     </div>
 
-    <!-- HUD Overlay -->
-    <div id="hud" class="absolute inset-0 z-20 pointer-events-none hidden flex flex-col justify-between p-4 safe-area-top safe-area-bottom safe-area-left safe-area-right">
-        
-        <!-- Top Status Bar -->
-        <div class="flex justify-between items-start">
-            <div class="flex flex-col gap-1">
-                <div class="glass-panel px-3 py-1.5 rounded-lg flex items-center gap-2">
-                    <i class="fa-solid fa-crosshairs text-red-500 text-xs animate-pulse"></i>
-                    <span id="wave-display" class="font-bold tracking-widest text-sm text-red-500">WAVE 1</span>
-                </div>
-                <div class="glass-panel px-3 py-1.5 rounded-lg flex items-center gap-2">
-                    <i class="fa-solid fa-trophy text-yellow-500 text-xs"></i>
-                    <span id="score-display" class="font-mono text-xs text-gray-300">SCORE: 0</span>
-                </div>
-            </div>
+    <!-- UI Overlay (Menu de Controle e Status) -->
+    <div class="fixed top-0 left-0 w-full p-4 z-20 flex justify-between items-center pointer-events-none">
+        <div class="bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-2 border border-white/20 pointer-events-auto max-w-[60%] truncate">
+            <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-yellow-500 animate-pulse shrink-0"></span>
+            <span id="status-text" class="truncate">Aguardando início...</span>
+        </div>
 
-            <!-- Hand Tracking Status -->
-            <div class="glass-panel px-3 py-1.5 rounded-lg flex items-center gap-2">
-                <div id="tracking-dot" class="w-2.5 h-2.5 rounded-full bg-red-600"></div>
-                <span id="tracking-text" class="text-xs font-mono uppercase tracking-wider text-gray-300">NO HAND</span>
-            </div>
-
-            <button id="pause-btn" class="pointer-events-auto glass-panel w-10 h-10 rounded-lg flex items-center justify-center text-white hover:border-red-500 active:scale-95 transition">
-                <i class="fa-solid fa-pause"></i>
+        <div class="flex gap-2 pointer-events-auto">
+            <button id="btn-switch-camera" class="bg-gray-800/80 hover:bg-gray-700 text-white p-3 rounded-full shadow-lg border border-white/30 transition flex items-center justify-center w-11 h-11" title="Alternar Câmera">
+                <i class="fa-solid fa-camera-rotate text-lg"></i>
             </button>
-        </div>
-
-        <!-- Boss Health Bar (Hidden by default) -->
-        <div id="boss-hud" class="w-full max-w-md mx-auto hidden flex-col items-center gap-1 my-2">
-            <div class="w-full flex justify-between text-xs font-bold text-red-500 tracking-widest uppercase">
-                <span id="boss-name">ALPHA ENTITY</span>
-                <span id="boss-hp-text">100%</span>
-            </div>
-            <div class="w-full h-3 bg-gray-950 rounded-full overflow-hidden border border-red-900/60 p-0.5">
-                <div id="boss-hp-bar" class="h-full bg-gradient-to-r from-red-800 to-red-500 rounded-full transition-all duration-200" style="width: 100%;"></div>
-            </div>
-        </div>
-
-        <!-- Bottom Controls & Ammo Display -->
-        <div class="flex justify-between items-end">
-            <!-- Health Bar -->
-            <div class="glass-panel p-3 rounded-xl flex flex-col gap-1 w-36 sm:w-48">
-                <div class="flex justify-between items-center text-xs text-gray-300 font-bold">
-                    <span><i class="fa-solid fa-heart text-red-500 mr-1"></i> LIFE</span>
-                    <span id="health-num">100</span>
-                </div>
-                <div class="w-full h-2.5 bg-black/60 rounded-full overflow-hidden border border-red-900/30">
-                    <div id="health-bar" class="h-full bg-red-600 transition-all duration-300 rounded-full" style="width: 100%;"></div>
-                </div>
-            </div>
-
-            <!-- WebXR VR Mode & Ammo Display -->
-            <div class="flex flex-col items-end gap-2">
-                <div id="vr-btn-container" class="pointer-events-auto"></div>
-                <div class="glass-panel px-4 py-2 rounded-xl flex items-center gap-3">
-                    <i class="fa-solid fa-gun text-red-500 text-lg"></i>
-                    <div class="flex flex-col items-end">
-                        <span id="ammo-count" class="font-mono text-xl font-black text-white tracking-widest">12 / 12</span>
-                        <span class="text-[10px] text-gray-400 uppercase tracking-wider">MAGAZINE</span>
-                    </div>
-                </div>
-                <button id="reload-btn" class="pointer-events-auto glass-panel px-4 py-2 rounded-xl text-xs font-bold tracking-wider text-red-400 hover:text-white border-red-500/40 active:scale-95 transition flex items-center gap-2">
-                    <i class="fa-solid fa-rotate-right"></i> RELOAD (PINCH / TAP)
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Announcement Overlay -->
-    <div id="announcement" class="absolute inset-0 z-30 pointer-events-none flex items-center justify-center text-center opacity-0 transition-opacity duration-500">
-        <div class="px-6 py-4 glass-panel rounded-2xl border-red-600/50 max-w-sm mx-4">
-            <h2 id="announce-title" class="text-2xl font-black text-red-500 tracking-widest uppercase glow-red mb-1">WAVE 1</h2>
-            <p id="announce-subtitle" class="text-xs text-gray-300 tracking-wide font-mono">THE NIGHTMARE BEGINS</p>
-        </div>
-    </div>
-
-    <!-- Main Menu Modal -->
-    <div id="menu-modal" class="absolute inset-0 z-40 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md safe-area-top safe-area-bottom">
-        <div class="glass-panel w-full max-w-md rounded-2xl p-6 flex flex-col gap-6 text-center border-red-600/40">
-            <div>
-                <h1 class="text-3xl font-black tracking-widest text-red-600 glow-red uppercase mb-1">AR HAND STRIKE</h1>
-                <p class="text-xs tracking-widest text-gray-400 font-mono uppercase">NIGHTMARE EDITION</p>
-            </div>
-
-            <div class="text-left text-xs text-gray-300 space-y-2.5 bg-black/40 p-4 rounded-xl border border-red-950">
-                <p class="font-bold text-red-400 uppercase tracking-wider border-b border-red-900/50 pb-1">Gestures & Combat:</p>
-                <div class="flex items-center gap-2.5">
-                    <i class="fa-solid fa-hand-pointer text-red-500 w-4 text-center"></i>
-                    <span><strong>Index Tip (Landmark 8):</strong> Aim weapon reticle.</span>
-                </div>
-                <div class="flex items-center gap-2.5">
-                    <i class="fa-solid fa-hand-back-fist text-red-500 w-4 text-center"></i>
-                    <span><strong>Pinch (Index + Thumb):</strong> Shoot active target.</span>
-                </div>
-                <div class="flex items-center gap-2.5">
-                    <i class="fa-solid fa-rotate-right text-red-500 w-4 text-center"></i>
-                    <span><strong>Manual Reload:</strong> Tap RELOAD or empty clip.</span>
-                </div>
-            </div>
-
-            <div class="flex flex-col gap-3">
-                <button id="start-btn" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-red-800 to-red-600 text-white font-bold tracking-widest hover:from-red-700 hover:to-red-500 active:scale-95 transition shadow-lg shadow-red-900/40">
-                    <i class="fa-solid fa-crosshairs mr-2"></i> ENTER NIGHTMARE
-                </button>
-                <button id="settings-toggle-btn" class="w-full py-2.5 rounded-xl glass-panel text-gray-300 text-xs font-bold tracking-wider hover:text-white active:scale-95 transition">
-                    <i class="fa-solid fa-sliders mr-2"></i> SETTINGS
-                </button>
-            </div>
-
-            <div class="text-[10px] text-gray-500 font-mono flex justify-between">
-                <span>HIGH SCORE: <strong id="menu-highscore" class="text-gray-300">0</strong></span>
-                <span>MAX WAVE: <strong id="menu-maxwave" class="text-gray-300">1</strong></span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Pause Modal -->
-    <div id="pause-modal" class="absolute inset-0 z-40 hidden flex-col items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-        <div class="glass-panel w-full max-w-sm rounded-2xl p-6 flex flex-col gap-5 text-center border-red-600/40">
-            <h2 class="text-xl font-black text-red-500 tracking-widest uppercase glow-red">SURVIVAL PAUSED</h2>
-            <div class="flex flex-col gap-3">
-                <button id="resume-btn" class="w-full py-3 rounded-xl bg-red-700 hover:bg-red-600 text-white font-bold tracking-wider active:scale-95 transition">
-                    RESUME
-                </button>
-                <button id="restart-pause-btn" class="w-full py-2.5 rounded-xl glass-panel text-gray-300 text-xs font-bold tracking-wider hover:text-white active:scale-95 transition">
-                    RESTART
-                </button>
-                <button id="quit-btn" class="w-full py-2.5 rounded-xl glass-panel text-red-400 text-xs font-bold tracking-wider hover:text-white active:scale-95 transition">
-                    MAIN MENU
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Game Over Modal -->
-    <div id="gameover-modal" class="absolute inset-0 z-40 hidden flex-col items-center justify-center p-4 bg-red-950/90 backdrop-blur-lg">
-        <div class="glass-panel w-full max-w-sm rounded-2xl p-6 flex flex-col gap-5 text-center border-red-500/50 shadow-2xl shadow-red-950">
-            <div>
-                <h2 class="text-3xl font-black text-red-600 tracking-widest uppercase glow-red mb-1">YOU DIED</h2>
-                <p class="text-xs text-gray-400 font-mono">CONSUMED BY THE DARKNESS</p>
-            </div>
-
-            <div class="bg-black/60 p-4 rounded-xl border border-red-900/40 flex flex-col gap-2 font-mono text-xs">
-                <div class="flex justify-between text-gray-400">
-                    <span>FINAL SCORE:</span>
-                    <span id="final-score" class="text-white font-bold">0</span>
-                </div>
-                <div class="flex justify-between text-gray-400">
-                    <span>WAVES SURVIVED:</span>
-                    <span id="final-wave" class="text-white font-bold">0</span>
-                </div>
-                <div class="flex justify-between text-gray-400">
-                    <span>ACCURACY:</span>
-                    <span id="final-accuracy" class="text-white font-bold">0%</span>
-                </div>
-            </div>
-
-            <button id="restart-btn" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-red-800 to-red-600 text-white font-bold tracking-widest hover:from-red-700 hover:to-red-500 active:scale-95 transition shadow-lg shadow-red-900/50">
-                TRY AGAIN
+            <button id="btn-toggle-vr" class="bg-indigo-600 hover:bg-indigo-500 text-white p-3 rounded-full shadow-lg border border-white/30 transition flex items-center justify-center w-11 h-11" title="Alternar Modo VR/AR">
+                <i class="fa-solid fa-vr-cardboard text-lg"></i>
+            </button>
+            <button id="btn-fullscreen" class="bg-gray-800/80 hover:bg-gray-700 text-white p-3 rounded-full shadow-lg border border-white/30 transition flex items-center justify-center w-11 h-11" title="Tela Cheia">
+                <i class="fa-solid fa-expand text-lg"></i>
             </button>
         </div>
     </div>
 
-    <!-- Settings Modal -->
-    <div id="settings-modal" class="absolute inset-0 z-50 hidden flex-col items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-        <div class="glass-panel w-full max-w-sm rounded-2xl p-6 flex flex-col gap-5 border-red-600/40">
-            <div class="flex justify-between items-center border-b border-red-900/40 pb-3">
-                <h2 class="text-lg font-bold text-red-500 tracking-wider">SYSTEM SETTINGS</h2>
-                <button id="close-settings-btn" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
+    <!-- Console de Debug na Tela (Oculto por padrão, exibe erros se houver) -->
+    <div id="debug-log" class="fixed bottom-2 left-2 right-2 z-30 bg-black/90 text-red-400 font-mono text-xs p-3 rounded-xl border border-red-500/30 hidden max-h-32 overflow-y-auto pointer-events-auto">
+    </div>
 
-            <div class="space-y-4 text-xs font-mono">
-                <!-- Audio Mute -->
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-300">SOUND EFFECTS & MUSIC</span>
-                    <button id="audio-toggle-btn" class="px-3 py-1 rounded-md glass-panel text-green-400 border-green-500/40 font-bold">ENABLED</button>
-                </div>
-                <!-- Sensitivity -->
-                <div class="flex flex-col gap-1.5">
-                    <div class="flex justify-between text-gray-300">
-                        <span>AIM SENSITIVITY</span>
-                        <span id="sens-val" class="text-red-400">1.0x</span>
-                    </div>
-                    <input type="range" id="sens-slider" min="0.5" max="2.0" step="0.1" value="1.0" class="w-full accent-red-600 bg-gray-900 rounded-lg cursor-pointer">
-                </div>
-                <!-- Graphics Quality -->
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-300">GRAPHICS QUALITY</span>
-                    <select id="graphics-select" class="bg-gray-900 text-red-400 border border-red-900/60 rounded px-2 py-1 focus:outline-none">
-                        <option value="high">HIGH (1.0x Resolution)</option>
-                        <option value="medium" selected>MEDIUM (0.75x Mobile)</option>
-                        <option value="low">LOW (0.5x Performance)</option>
-                    </select>
-                </div>
+    <!-- Modal Inicial -->
+    <div id="start-modal" class="fixed inset-0 bg-black/90 backdrop-blur-lg z-50 flex items-center justify-center p-6 text-center">
+        <div class="max-w-md bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-2xl">
+            <div class="w-16 h-16 bg-indigo-600/20 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl border border-indigo-500/30">
+                <i class="fa-solid fa-camera"></i>
             </div>
-            
-            <button id="save-settings-btn" class="w-full py-2.5 rounded-xl bg-red-700 hover:bg-red-600 text-white font-bold text-xs tracking-wider">
-                SAVE & BACK
+            <h1 class="text-xl font-bold mb-2">Protótipo VR Passthrough</h1>
+            <p class="text-gray-400 text-sm mb-6">
+                Este aplicativo utiliza a <b>câmera traseira</b> como fundo VR para interagir com objetos 3D usando suas mãos.
+            </p>
+            <button id="btn-start" class="w-full py-3.5 px-6 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl shadow-lg transition duration-200 text-sm flex items-center justify-center gap-2">
+                <i class="fa-solid fa-play"></i> Iniciar Câmera & VR
             </button>
         </div>
     </div>
 
-    <!-- MAIN GAME SCRIPT -->
     <script>
-        /**
-         * AR HAND STRIKE: NIGHTMARE - Game Core Logic
-         * Single-file integrated iOS AR horror game.
-         */
+        // Estado Global
+        let isVRMode = true;
+        let cameraStream = null;
+        let handDetector = null;
+        let mediaPipeCamera = null;
+        let videoTexture = null;
+        let videoPlaneMesh = null;
+        let currentFacingMode = "environment";
+        let isInitialized = false;
 
-        // Global State & Settings
-        const gameState = {
-            isRunning: false,
-            isPaused: false,
-            isVR: false,
-            score: 0,
-            wave: 1,
-            health: 100,
-            maxHealth: 100,
-            ammo: 12,
-            maxAmmo: 12,
-            isReloading: false,
-            shotsFired: 0,
-            shotsHit: 0,
-            audioEnabled: true,
-            sensitivity: 1.0,
-            graphicsQuality: 'medium',
-            highScore: parseInt(localStorage.getItem('ar_nightmare_highscore') || '0'),
-            maxWave: parseInt(localStorage.getItem('ar_nightmare_maxwave') || '1'),
-            handDetected: false,
-            lastPinchTime: 0,
-            isPinching: false,
-            activeBoss: null
-        };
+        // Three.js
+        let scene, cameraLeft, cameraRight, rendererLeft, rendererRight;
+        let interactiveObjects = [];
+        let handJoints3D = [];
+        let handBones3D = [];
 
-        // Three.js Scene & WebXR Setup
-        let scene, camera, renderer, raycaster;
-        let xrHandController, laserPointer;
-        const monsters = [];
-        const particles = [];
-        let lightFlash;
+        // Conexões das articulações da mão (MediaPipe Hand Connections)
+        const HAND_CONNECTIONS = [
+            [0,1],[1,2],[2,3],[3,4],        // Polegar
+            [0,5],[5,6],[6,7],[7,8],        // Indicador
+            [5,9],[9,10],[10,11],[11,12],   // Médio
+            [9,13],[13,14],[14,15],[15,16], // Anelar
+            [13,17],[17,18],[18,19],[19,20],[0,17] // Mínimo & Palma
+        ];
 
-        function initThreeJS() {
-            scene = new THREE.Scene();
-            scene.fog = new THREE.FogExp2(0x0a0204, 0.08);
+        // Elementos DOM
+        const videoElement = document.getElementById('webcam-video');
+        const container = document.getElementById('app-container');
+        const rightEye = document.getElementById('right-eye');
+        const statusText = document.getElementById('status-text');
+        const statusDot = document.getElementById('status-dot');
+        const startModal = document.getElementById('start-modal');
+        const btnStart = document.getElementById('btn-start');
+        const btnSwitchCamera = document.getElementById('btn-switch-camera');
+        const btnToggleVR = document.getElementById('btn-toggle-vr');
+        const btnFullscreen = document.getElementById('btn-fullscreen');
+        const debugLog = document.getElementById('debug-log');
 
-            camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 100);
-            camera.position.set(0, 0, 0);
-
-            renderer = new THREE.WebGLRenderer({
-                canvas: DOM.canvas,
-                alpha: true,
-                antialias: true,
-                powerPreference: "high-performance"
-            });
-            
-            // Enable WebXR Mode in Three.js Engine
-            renderer.xr.enabled = true;
-            document.getElementById('vr-btn-container').appendChild(VRButton.createButton(renderer));
-
-            // WebXR Session State Callbacks
-            renderer.xr.addEventListener('sessionstart', () => {
-                gameState.isVR = true;
-                setupVRHandPointers();
-            });
-            renderer.xr.addEventListener('sessionend', () => {
-                gameState.isVR = false;
-            });
-
-            updateRendererSize();
-
-            const ambientLight = new THREE.AmbientLight(0x221111, 1.2);
-            scene.add(ambientLight);
-
-            const redDirLight = new THREE.DirectionalLight(0xff1100, 1.5);
-            redDirLight.position.set(0, 5, 2);
-            scene.add(redDirLight);
-
-            lightFlash = new THREE.PointLight(0xffffff, 0, 15);
-            lightFlash.position.set(0, 0, 0);
-            scene.add(lightFlash);
-
-            raycaster = new THREE.Raycaster();
-
-            createFloatingDust();
+        function logError(msg) {
+            console.error(msg);
+            debugLog.classList.remove('hidden');
+            debugLog.innerHTML += `<div>> ${msg}</div>`;
         }
 
-        // Setup VR Controllers & Hand Motion Laser Tracking
-        function setupVRHandPointers() {
-            xrHandController = renderer.xr.getController(0);
-            
-            // Add Visual VR Laser Aiming Line
-            const laserGeo = new THREE.BufferGeometry().setFromPoints([
-                new THREE.Vector3(0, 0, 0),
-                new THREE.Vector3(0, 0, -10)
-            ]);
-            const laserMat = new THREE.LineBasicMaterial({ color: 0xff0000, linewidth: 2 });
-            laserPointer = new THREE.Line(laserGeo, laserMat);
-            xrHandController.add(laserPointer);
-
-            // VR Trigger / Pinch Event Binding
-            xrHandController.addEventListener('selectstart', () => {
-                if (gameState.isRunning && !gameState.isPaused) {
-                    const tempMatrix = new THREE.Matrix4();
-                    tempMatrix.identity().extractRotation(xrHandController.matrixWorld);
-                    raycaster.ray.origin.setFromMatrixPosition(xrHandController.matrixWorld);
-                    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
-                    
-                    shootVR();
-                }
-            });
-
-            scene.add(xrHandController);
-        }
-
-        function shootVR() {
-            if (gameState.isReloading || !gameState.isRunning || gameState.isPaused) return;
-
-            if (gameState.ammo <= 0) {
-                reloadAmmo();
-                return;
-            }
-
-            gameState.ammo--;
-            gameState.shotsFired++;
-            updateAmmoUI();
-
-            audioEngine.playShoot();
-
-            lightFlash.intensity = 4;
-            setTimeout(() => { lightFlash.intensity = 0; }, 50);
-
-            // Collect target meshes for VR Raycasting
-            const targetMeshes = [];
-            monsters.forEach(m => {
-                m.mesh.traverse(child => {
-                    if (child.isMesh) {
-                        child.userData.monster = m;
-                        targetMeshes.push(child);
-                    }
-                });
-            });
-
-            const intersects = raycaster.intersectObjects(targetMeshes);
-
-            if (intersects.length > 0) {
-                gameState.shotsHit++;
-                const hitMonster = intersects[0].object.userData.monster;
-                if (hitMonster) {
-                    hitMonster.takeDamage(35);
-                }
+        function updateStatus(text, type = "loading") {
+            statusText.innerText = text;
+            if (type === "ok") {
+                statusDot.className = "w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shrink-0";
+            } else if (type === "error") {
+                statusDot.className = "w-2.5 h-2.5 rounded-full bg-red-500 shrink-0";
+            } else {
+                statusDot.className = "w-2.5 h-2.5 rounded-full bg-yellow-500 animate-pulse shrink-0";
             }
         }
 
-        // WebXR Aware Animation Loop
-        function gameLoop() {
-            renderer.setAnimationLoop((time, frame) => {
-                const delta = 0.016;
-
-                if (gameState.isRunning && !gameState.isPaused) {
-                    // Process Camera Hand Tracking (Non-VR Mode)
-                    if (!gameState.isVR) {
-                        processHandTracking();
-                    }
-
-                    // Update Monsters & FX
-                    monsters.forEach(m => m.update(delta));
-                    updateParticles(delta);
-
-                    // Update Boss Health Bar
-                    if (gameState.activeBoss && !gameState.activeBoss.isDead) {
-                        const hpPct = Math.max(0, (gameState.activeBoss.hp / gameState.activeBoss.maxHp) * 100);
-                        DOM.bossHpBar.style.width = `${hpPct}%`;
-                        DOM.bossHpText.textContent = `${Math.round(hpPct)}%`;
-                    }
-
-                    // Render Three.js Scene
-                    renderer.render(scene, camera);
-                }
-            });
-        }
-
-            init() {
-                if (this.isInit) return;
-                const AudioCtx = window.AudioContext || window.webkitAudioContext;
-                this.ctx = new AudioCtx();
-                this.isInit = true;
-            }
-
-            playShoot() {
-                if (!gameState.audioEnabled || !this.ctx) return;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                const filter = this.ctx.createBiquadFilter();
-
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(320, this.ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(30, this.ctx.currentTime + 0.18);
-
-                filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(2000, this.ctx.currentTime);
-                filter.frequency.linearRampToValueAtTime(200, this.ctx.currentTime + 0.18);
-
-                gain.gain.setValueAtTime(0.8, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.18);
-
-                osc.connect(filter);
-                filter.connect(gain);
-                gain.connect(this.ctx.destination);
-
-                osc.start();
-                osc.stop(this.ctx.currentTime + 0.18);
-            }
-
-            playHit() {
-                if (!gameState.audioEnabled || !this.ctx) return;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(150, this.ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.1);
-
-                gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
-
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start();
-                osc.stop(this.ctx.currentTime + 0.1);
-            }
-
-            playReload() {
-                if (!gameState.audioEnabled || !this.ctx) return;
-                const now = this.ctx.currentTime;
-                // Mechanical Click 1
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'square';
-                osc.frequency.setValueAtTime(800, now);
-                gain.gain.setValueAtTime(0.3, now);
-                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start(now);
-                osc.stop(now + 0.08);
-
-                // Mechanical Slide Click 2
-                const osc2 = this.ctx.createOscillator();
-                const gain2 = this.ctx.createGain();
-                osc2.type = 'sawtooth';
-                osc2.frequency.setValueAtTime(400, now + 0.25);
-                gain2.gain.setValueAtTime(0.4, now + 0.25);
-                gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
-                osc2.connect(gain2);
-                gain2.connect(this.ctx.destination);
-                osc2.start(now + 0.25);
-                osc2.stop(now + 0.4);
-            }
-
-            playMonsterGrowl() {
-                if (!gameState.audioEnabled || !this.ctx) return;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(60 + Math.random() * 40, this.ctx.currentTime);
-                osc.frequency.linearRampToValueAtTime(30, this.ctx.currentTime + 0.6);
-
-                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.6);
-
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start();
-                osc.stop(this.ctx.currentTime + 0.6);
-            }
-
-            playPlayerHurt() {
-                if (!gameState.audioEnabled || !this.ctx) return;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(100, this.ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(200, this.ctx.currentTime + 0.2);
-
-                gain.gain.setValueAtTime(0.7, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
-
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start();
-                osc.stop(this.ctx.currentTime + 0.25);
-            }
-        }
-
-        const audioEngine = new HorrorAudioEngine();
-
-        // Three.js Scene Setup
-        let scene, camera, renderer, raycaster;
-        const monsters = [];
-        const particles = [];
-        let lightFlash;
-
-        function initThreeJS() {
-            scene = new THREE.Scene();
-
-            // Atmospheric Horror Fog
-            scene.fog = new THREE.FogExp2(0x0a0204, 0.08);
-
-            // Camera Setup
-            camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 100);
-            camera.position.set(0, 0, 0);
-
-            // WebGL Renderer Setup
-            renderer = new THREE.WebGLRenderer({
-                canvas: DOM.canvas,
-                alpha: true,
-                antialias: false, // Performance optimization for iOS Safari
-                powerPreference: "high-performance"
-            });
-            
-            updateRendererSize();
-
-            // Ambient & Horror Red Lighting
-            const ambientLight = new THREE.AmbientLight(0x221111, 1.2);
-            scene.add(ambientLight);
-
-            const redDirLight = new THREE.DirectionalLight(0xff1100, 1.5);
-            redDirLight.position.set(0, 5, 2);
-            scene.add(redDirLight);
-
-            lightFlash = new THREE.PointLight(0xffffff, 0, 15);
-            lightFlash.position.set(0, 0, 0);
-            scene.add(lightFlash);
-
-            // Raycaster for shooting logic
-            raycaster = new THREE.Raycaster();
-
-            // Floating Dust Particles
-            createFloatingDust();
-        }
-
-        function updateRendererSize() {
-            if (!renderer || !camera) return;
-            const w = window.innerWidth;
-            const h = window.innerHeight;
-            
-            let scale = 0.75; // medium default
-            if (gameState.graphicsQuality === 'high') scale = 1.0;
-            if (gameState.graphicsQuality === 'low') scale = 0.5;
-
-            renderer.setSize(w, h, false);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, scale * 1.5));
-            camera.aspect = w / h;
-            camera.updateProjectionMatrix();
-        }
-
-        // Floating Atmospheric Particles
-        function createFloatingDust() {
-            const particleCount = 60;
-            const geometry = new THREE.BufferGeometry();
-            const positions = new Float32Array(particleCount * 3);
-
-            for (let i = 0; i < particleCount * 3; i += 3) {
-                positions[i] = (Math.random() - 0.5) * 12;
-                positions[i + 1] = (Math.random() - 0.5) * 10;
-                positions[i + 2] = -Math.random() * 12;
-            }
-
-            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-            const material = new THREE.PointsMaterial({
-                color: 0xef4444,
-                size: 0.05,
-                transparent: true,
-                opacity: 0.6
-            });
-
-            const dust = new THREE.Points(geometry, material);
-            scene.add(dust);
-        }
-
-        // Procedural Scary Monster Generator
-        class Monster {
-            constructor(type, waveFactor = 1) {
-                this.type = type; // 'crawler', 'stalker', 'specter', 'brute', 'boss'
-                this.mesh = new THREE.Group();
-                this.isDead = false;
-                this.animationTime = Math.random() * 10;
-
-                // Configure Stats
-                switch (type) {
-                    case 'crawler':
-                        this.maxHp = 20 * waveFactor;
-                        this.speed = 1.6 + Math.random() * 0.4;
-                        this.damage = 10;
-                        this.scale = 0.6;
-                        this.yOffset = -1.2;
-                        break;
-                    case 'stalker':
-                        this.maxHp = 35 * waveFactor;
-                        this.speed = 1.1 + Math.random() * 0.3;
-                        this.damage = 15;
-                        this.scale = 1.0;
-                        this.yOffset = -0.5;
-                        break;
-                    case 'specter':
-                        this.maxHp = 25 * waveFactor;
-                        this.speed = 1.4;
-                        this.damage = 12;
-                        this.scale = 0.9;
-                        this.yOffset = 0.2;
-                        break;
-                    case 'brute':
-                        this.maxHp = 80 * waveFactor;
-                        this.speed = 0.6;
-                        this.damage = 25;
-                        this.scale = 1.5;
-                        this.yOffset = -0.6;
-                        break;
-                    case 'boss':
-                        this.maxHp = 300 * waveFactor;
-                        this.speed = 0.45;
-                        this.damage = 35;
-                        this.scale = 2.4;
-                        this.yOffset = -0.8;
-                        break;
-                }
-
-                this.hp = this.maxHp;
-                this.buildProceduralModel();
-                this.spawn();
-            }
-
-            buildProceduralModel() {
-                const bodyMat = new THREE.MeshStandardMaterial({
-                    color: this.type === 'specter' ? 0x225566 : (this.type === 'boss' ? 0x2d0505 : 0x111111),
-                    roughness: 0.8,
-                    metalness: 0.2,
-                    transparent: this.type === 'specter',
-                    opacity: this.type === 'specter' ? 0.65 : 1.0
-                });
-
-                const eyeMat = new THREE.MeshBasicMaterial({
-                    color: this.type === 'boss' ? 0xff0000 : (this.type === 'specter' ? 0x00ffff : 0xff2200)
-                });
-
-                // Torso / Core
-                const torsoGeo = new THREE.CylinderGeometry(0.2, 0.3, 1.2, 6);
-                const torso = new THREE.Mesh(torsoGeo, bodyMat);
-                torso.position.y = 0.6;
-                this.mesh.add(torso);
-
-                // Deformed Head
-                const headGeo = new THREE.DodecahedronGeometry(0.25, 1);
-                const head = new THREE.Mesh(headGeo, bodyMat);
-                head.position.set(0, 1.3, 0);
-                this.mesh.add(head);
-
-                // Glowing Eyes
-                const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), eyeMat);
-                eyeL.position.set(-0.09, 1.35, 0.2);
-                const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), eyeMat);
-                eyeR.position.set(0.09, 1.35, 0.2);
-                this.mesh.add(eyeL, eyeR);
-
-                // Elongated Limbs
-                this.limbs = [];
-                const limbCount = this.type === 'crawler' ? 4 : 2;
-                for (let i = 0; i < limbCount; i++) {
-                    const limbGeo = new THREE.BoxGeometry(0.08, 0.9, 0.08);
-                    const limb = new THREE.Mesh(limbGeo, bodyMat);
-                    const side = i % 2 === 0 ? 1 : -1;
-                    limb.position.set(side * 0.35, 0.5, 0);
-                    this.mesh.add(limb);
-                    this.limbs.push(limb);
-                }
-
-                // Scale & Setup Group
-                this.mesh.scale.set(this.scale, this.scale, this.scale);
-                this.mesh.userData = { monster: this };
-                scene.add(this.mesh);
-            }
-
-            spawn() {
-                // Random spawn angle in front arc
-                const angle = (Math.random() - 0.5) * Math.PI * 0.8;
-                const distance = 8 + Math.random() * 4;
-
-                this.mesh.position.x = Math.sin(angle) * distance;
-                this.mesh.position.z = -Math.cos(angle) * distance;
-                this.mesh.position.y = this.yOffset;
-
-                // Face the camera
-                this.mesh.lookAt(0, this.mesh.position.y, 0);
-            }
-
-            update(delta) {
-                if (this.isDead) return;
-
-                this.animationTime += delta * 4;
-
-                // Walk / Float Wobble Animation
-                this.mesh.position.y = this.yOffset + Math.sin(this.animationTime * 2) * 0.08;
-                this.limbs.forEach((limb, idx) => {
-                    limb.rotation.x = Math.sin(this.animationTime + idx) * 0.4;
-                });
-
-                // Move toward player camera
-                const dir = new THREE.Vector3(0, this.yOffset, 0).sub(this.mesh.position).normalize();
-                this.mesh.position.addScaledVector(dir, this.speed * delta);
-                this.mesh.lookAt(0, this.mesh.position.y, 0);
-
-                // Distance to Player check for attack
-                const dist = this.mesh.position.distanceTo(new THREE.Vector3(0, this.yOffset, 0));
-                if (dist < 1.2) {
-                    this.attackPlayer();
-                }
-            }
-
-            takeDamage(amount) {
-                this.hp -= amount;
-
-                // Visual knockback / hit wobble
-                this.mesh.position.z += 0.2;
-                audioEngine.playHit();
-
-                // Spawn blood/spark particles
-                spawnHitParticles(this.mesh.position);
-
-                if (this.hp <= 0) {
-                    this.die();
-                }
-            }
-
-            attackPlayer() {
-                damagePlayer(this.damage);
-                audioEngine.playMonsterGrowl();
-                // Push back monster slightly after attack
-                this.mesh.position.z -= 1.5;
-            }
-
-            die() {
-                if (this.isDead) return;
-                this.isDead = true;
-
-                // Add to score
-                const points = this.type === 'boss' ? 500 : 100;
-                addScore(points);
-
-                // Fade/Collapse Animation
-                scene.remove(this.mesh);
-
-                // Remove from active array
-                const idx = monsters.indexOf(this);
-                if (idx > -1) monsters.splice(idx, 1);
-
-                checkWaveCompletion();
-            }
-        }
-
-        function spawnHitParticles(pos) {
-            const count = 12;
-            for (let i = 0; i < count; i++) {
-                const pGeo = new THREE.SphereGeometry(0.03, 4, 4);
-                const pMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-                const p = new THREE.Mesh(pGeo, pMat);
-                p.position.copy(pos);
-                p.userData.vel = new THREE.Vector3(
-                    (Math.random() - 0.5) * 2,
-                    (Math.random() - 0.5) * 2,
-                    (Math.random() - 0.5) * 2
-                );
-                p.userData.life = 0.3;
-                scene.add(p);
-                particles.push(p);
-            }
-        }
-
-        function updateParticles(delta) {
-            for (let i = particles.length - 1; i >= 0; i--) {
-                const p = particles[i];
-                p.userData.life -= delta;
-                p.position.addScaledVector(p.userData.vel, delta);
-                if (p.userData.life <= 0) {
-                    scene.remove(p);
-                    particles.splice(i, 1);
-                }
-            }
-        }
-
-        // Player & Wave Management
-        function damagePlayer(amount) {
-            gameState.health = Math.max(0, gameState.health - amount);
-            DOM.healthBar.style.width = `${(gameState.health / gameState.maxHealth) * 100}%`;
-            DOM.healthNum.textContent = Math.round(gameState.health);
-
-            // Flash screen red
-            DOM.damageFlash.style.opacity = '1';
-            setTimeout(() => { DOM.damageFlash.style.opacity = '0'; }, 200);
-
-            audioEngine.playPlayerHurt();
-
-            if (gameState.health <= 0) {
-                gameOver();
-            }
-        }
-
-        function addScore(pts) {
-            gameState.score += pts;
-            DOM.scoreDisplay.textContent = `SCORE: ${gameState.score}`;
-        }
-
-        function startNextWave() {
-            monsters.forEach(m => scene.remove(m.mesh));
-            monsters.length = 0;
-
-            const isBossWave = gameState.wave % 5 === 0;
-
-            showAnnouncement(
-                `WAVE ${gameState.wave}`,
-                isBossWave ? "WARNING: ALPHA ENTITY DETECTED!" : "SURVIVE THE HORDE"
-            );
-
-            DOM.waveDisplay.textContent = `WAVE ${gameState.wave}`;
-
-            // Partial health recovery & ammo refill on wave start
-            gameState.health = Math.min(gameState.maxHealth, gameState.health + 25);
-            DOM.healthBar.style.width = `${(gameState.health / gameState.maxHealth) * 100}%`;
-            DOM.healthNum.textContent = Math.round(gameState.health);
-            reloadAmmo();
-
-            // Spawn Monster Wave
-            setTimeout(() => {
-                if (!gameState.isRunning) return;
-
-                if (isBossWave) {
-                    const boss = new Monster('boss', gameState.wave);
-                    monsters.push(boss);
-                    gameState.activeBoss = boss;
-                    DOM.bossHud.classList.remove('hidden');
-                    DOM.bossHud.classList.add('flex');
-                    DOM.bossName.textContent = "ALPHA ENTITY";
-                } else {
-                    DOM.bossHud.classList.add('hidden');
-                    DOM.bossHud.classList.remove('flex');
-                    gameState.activeBoss = null;
-
-                    const count = 3 + Math.floor(gameState.wave * 1.5);
-                    const types = ['crawler', 'stalker', 'specter', 'brute'];
-
-                    for (let i = 0; i < count; i++) {
-                        const type = types[Math.floor(Math.random() * types.length)];
-                        monsters.push(new Monster(type, 1 + gameState.wave * 0.15));
-                    }
-                }
-            }, 2000);
-        }
-
-        function checkWaveCompletion() {
-            if (monsters.length === 0 && gameState.isRunning) {
-                gameState.wave++;
-                if (gameState.wave > gameState.maxWave) {
-                    gameState.maxWave = gameState.wave;
-                    localStorage.setItem('ar_nightmare_maxwave', gameState.maxWave.toString());
-                }
-                setTimeout(startNextWave, 1500);
-            }
-        }
-
-        function showAnnouncement(title, subtitle) {
-            DOM.announceTitle.textContent = title;
-            DOM.announceSubtitle.textContent = subtitle;
-            DOM.announcement.style.opacity = '1';
-            setTimeout(() => {
-                DOM.announcement.style.opacity = '0';
-            }, 2200);
-        }
-
-        // Weapons & Shooting Logic
-        function shoot(reticleX, reticleY) {
-            if (gameState.isReloading || !gameState.isRunning || gameState.isPaused) return;
-
-            if (gameState.ammo <= 0) {
-                reloadAmmo();
-                return;
-            }
-
-            gameState.ammo--;
-            gameState.shotsFired++;
-            updateAmmoUI();
-
-            audioEngine.playShoot();
-
-            // Muzzle Flash Light
-            lightFlash.intensity = 4;
-            setTimeout(() => { lightFlash.intensity = 0; }, 50);
-
-            // Calculate Raycast from Reticle Screen Coordinates
-            const mouse = new THREE.Vector2(
-                (reticleX / window.innerWidth) * 2 - 1,
-                -(reticleY / window.innerHeight) * 2 + 1
-            );
-
-            raycaster.setFromCamera(mouse, camera);
-
-            // Collect target meshes
-            const targetMeshes = [];
-            monsters.forEach(m => {
-                m.mesh.traverse(child => {
-                    if (child.isMesh) {
-                        child.userData.monster = m;
-                        targetMeshes.push(child);
-                    }
-                });
-            });
-
-            const intersects = raycaster.intersectObjects(targetMeshes);
-
-            if (intersects.length > 0) {
-                gameState.shotsHit++;
-                const hitMonster = intersects[0].object.userData.monster;
-                if (hitMonster) {
-                    hitMonster.takeDamage(25);
-                }
-            }
-        }
-
-        function reloadAmmo() {
-            if (gameState.isReloading) return;
-            gameState.isReloading = true;
-            DOM.reloadBtn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> RELOADING...`;
-            audioEngine.playReload();
-
-            setTimeout(() => {
-                gameState.ammo = gameState.maxAmmo;
-                gameState.isReloading = false;
-                updateAmmoUI();
-                DOM.reloadBtn.innerHTML = `<i class="fa-solid fa-rotate-right"></i> RELOAD (PINCH / TAP)`;
-            }, 1200);
-        }
-
-        function updateAmmoUI() {
-            DOM.ammoCount.textContent = `${gameState.ammo} / ${gameState.maxAmmo}`;
-        }
-
-        // MediaPipe Hand Tracking Setup
-        let handLandmarker;
-        let lastVideoTime = -1;
-
-        async function initHandTracking() {
+        // --- ESTRATÉGIA ROBUSTA DE CAPTURA DE CÂMERA ---
+        async function getRearCameraDeviceId() {
             try {
-                const vision = await FilesetResolver.forVisionTasks(
-                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(d => d.kind === 'videoinput');
+                
+                // Procurar por palavras-chave de câmera traseira no label
+                const rearDevice = videoDevices.find(d => 
+                    d.label.toLowerCase().includes('back') || 
+                    d.label.toLowerCase().includes('rear') || 
+                    d.label.toLowerCase().includes('environment') ||
+                    d.label.toLowerCase().includes('traseira')
                 );
 
-                handLandmarker = await HandLandmarker.createFromOptions(vision, {
-                    baseOptions: {
-                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-                        delegate: "GPU"
-                    },
-                    runningMode: "VIDEO",
-                    numHands: 1
-                });
-
-                startCamera();
-            } catch (err) {
-                console.error("Error initializing MediaPipe Hand Landmarker:", err);
-                DOM.trackingText.textContent = "TRACKING ERROR";
+                if (rearDevice) return rearDevice.deviceId;
+                if (videoDevices.length > 1) return videoDevices[videoDevices.length - 1].deviceId; // Geralmente a última é a traseira
+                if (videoDevices.length > 0) return videoDevices[0].deviceId;
+            } catch (e) {
+                console.warn("Não foi possível enumerar dispositivos:", e);
             }
+            return null;
         }
 
-        async function startCamera() {
+        async function startCamera(targetFacingMode = "environment") {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: "environment", // iOS Rear Camera
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    },
-                    audio: false
-                });
+                updateStatus("Solicitando acesso à câmera...");
 
-                DOM.video.srcObject = stream;
-                DOM.video.addEventListener("loadeddata", () => {
-                    DOM.video.play();
-                });
-            } catch (err) {
-                console.error("Camera Access Denied or Unavailable:", err);
-                DOM.trackingText.textContent = "CAMERA ERROR";
-            }
-        }
+                if (cameraStream) {
+                    cameraStream.getTracks().forEach(track => track.stop());
+                }
 
-        function processHandTracking() {
-            if (!handLandmarker || !DOM.video || DOM.video.paused) return;
+                currentFacingMode = targetFacingMode;
+                let stream = null;
 
-            if (DOM.video.currentTime !== lastVideoTime) {
-                lastVideoTime = DOM.video.currentTime;
-                const results = handLandmarker.detectForVideo(DOM.video, performance.now());
-
-                if (results.landmarks && results.landmarks.length > 0) {
-                    const landmarks = results.landmarks[0];
-                    gameState.handDetected = true;
-
-                    // Update Hand Tracking Indicator
-                    DOM.trackingDot.className = "w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse";
-                    DOM.trackingText.textContent = "HAND READY";
-                    DOM.reticle.style.display = "block";
-
-                    // Aiming Reticle via Index Tip (Landmark 8)
-                    const indexTip = landmarks[8];
+                // Tentar 1: ideal facingMode (Mais seguro para mobile)
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: { ideal: targetFacingMode },
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        },
+                        audio: false
+                    });
+                } catch (e1) {
+                    console.warn("Tentativa 1 com facingMode ideal falhou, buscando deviceId...", e1);
                     
-                    // Convert normalized coordinates to screen pixel position
-                    // Note: Rear camera stream is direct (unmirrored)
-                    const rawX = indexTip.x * window.innerWidth;
-                    const rawY = indexTip.y * window.innerHeight;
-
-                    // Apply Sensitivity
-                    const centerX = window.innerWidth / 2;
-                    const centerY = window.innerHeight / 2;
-                    const reticleX = centerX + (rawX - centerX) * gameState.sensitivity;
-                    const reticleY = centerY + (rawY - centerY) * gameState.sensitivity;
-
-                    DOM.reticle.style.left = `${reticleX}px`;
-                    DOM.reticle.style.top = `${reticleY}px`;
-
-                    // Pinch Detection: Index Tip (8) to Thumb Tip (4) distance
-                    const thumbTip = landmarks[4];
-                    const dist = Math.hypot(
-                        (indexTip.x - thumbTip.x) * window.innerWidth,
-                        (indexTip.y - thumbTip.y) * window.innerHeight
-                    );
-
-                    const pinchThreshold = 45; // Pixels
-                    const now = performance.now();
-
-                    if (dist < pinchThreshold) {
-                        DOM.reticleRing.classList.add("reticle-pinch");
-                        if (!gameState.isPinching && (now - gameState.lastPinchTime > 220)) {
-                            gameState.isPinching = true;
-                            gameState.lastPinchTime = now;
-                            shoot(reticleX, reticleY);
+                    // Tentar 2: Busca explicita de DeviceID se for câmera traseira
+                    if (targetFacingMode === "environment") {
+                        const deviceId = await getRearCameraDeviceId();
+                        if (deviceId) {
+                            try {
+                                stream = await navigator.mediaDevices.getUserMedia({
+                                    video: { deviceId: { exact: deviceId } },
+                                    audio: false
+                                });
+                            } catch (e2) {
+                                console.warn("Tentativa 2 com DeviceID falhou...", e2);
+                            }
                         }
-                    } else {
-                        gameState.isPinching = false;
-                        DOM.reticleRing.classList.remove("reticle-pinch");
                     }
 
+                    // Tentar 3: Câmera genérica sem restrições
+                    if (!stream) {
+                        stream = await navigator.mediaDevices.getUserMedia({
+                            video: true,
+                            audio: false
+                        });
+                    }
+                }
+
+                if (!stream) {
+                    throw new Error("Não foi possível obter fluxo de vídeo da câmera.");
+                }
+
+                cameraStream = stream;
+                videoElement.srcObject = cameraStream;
+
+                // Garantir execução no iOS/Safari
+                await new Promise((resolve) => {
+                    videoElement.onloadedmetadata = () => {
+                        videoElement.play().then(resolve).catch(resolve);
+                    };
+                });
+
+                updateStatus(`Procurando mãos...`, "loading");
+
+                // Atualizar ou criar textura de vídeo no Three.js
+                setupVideoTexture();
+
+            } catch (err) {
+                logError(`Erro de Câmera: ${err.name} - ${err.message}`);
+                updateStatus("Falha ao abrir câmera", "error");
+            }
+        }
+
+        async function switchCamera() {
+            const nextMode = currentFacingMode === "environment" ? "user" : "environment";
+            await startCamera(nextMode);
+        }
+
+        // --- THREE.JS CENA E TEXTURA ---
+        function initThreeJS() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+
+            scene = new THREE.Scene();
+
+            // Câmeras
+            cameraLeft = new THREE.PerspectiveCamera(60, (width / 2) / height, 0.1, 100);
+            cameraRight = new THREE.PerspectiveCamera(60, (width / 2) / height, 0.1, 100);
+            
+            // Leve separação entre os olhos (IPD)
+            cameraLeft.position.set(-0.03, 0, 0);
+            cameraRight.position.set(0.03, 0, 0);
+
+            // Renderizadores
+            const canvasLeft = document.getElementById('canvas-left');
+            const canvasRight = document.getElementById('canvas-right');
+
+            rendererLeft = new THREE.WebGLRenderer({ canvas: canvasLeft, antialias: true, alpha: true });
+            rendererRight = new THREE.WebGLRenderer({ canvas: canvasRight, antialias: true, alpha: true });
+
+            rendererLeft.setSize(width / 2, height);
+            rendererRight.setSize(width / 2, height);
+            rendererLeft.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            rendererRight.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            // Iluminação
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            dirLight.position.set(0, 5, 5);
+            scene.add(dirLight);
+
+            createInteractiveElements();
+            createHandSkeleton();
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function setupVideoTexture() {
+            if (!videoTexture) {
+                videoTexture = new THREE.VideoTexture(videoElement);
+                videoTexture.minFilter = THREE.LinearFilter;
+                videoTexture.magFilter = THREE.LinearFilter;
+                videoTexture.format = THREE.RGBAFormat;
+
+                const geometry = new THREE.PlaneGeometry(16, 9);
+                const material = new THREE.MeshBasicMaterial({
+                    map: videoTexture,
+                    depthTest: false,
+                    depthWrite: false
+                });
+
+                videoPlaneMesh = new THREE.Mesh(geometry, material);
+                videoPlaneMesh.position.set(0, 0, -5);
+                videoPlaneMesh.renderOrder = -1;
+                scene.add(videoPlaneMesh);
+            } else {
+                videoTexture.needsUpdate = true;
+            }
+        }
+
+        function createInteractiveElements() {
+            const colors = [0x00ffcc, 0xff0077, 0x7700ff, 0xffaa00, 0x00ff66];
+            
+            for (let i = 0; i < 5; i++) {
+                const geom = (i % 2 === 0) 
+                    ? new THREE.IcosahedronGeometry(0.2, 1) 
+                    : new THREE.BoxGeometry(0.25, 0.25, 0.25);
+
+                const mat = new THREE.MeshStandardMaterial({
+                    color: colors[i % colors.length],
+                    wireframe: i % 2 === 0,
+                    roughness: 0.3,
+                    metalness: 0.7
+                });
+
+                const mesh = new THREE.Mesh(geom, mat);
+                
+                const angle = (i / 5) * Math.PI * 0.6 - (Math.PI * 0.3);
+                mesh.position.x = Math.sin(angle) * 1.5;
+                mesh.position.y = (Math.random() - 0.5) * 0.5;
+                mesh.position.z = -Math.cos(angle) * 1.5;
+
+                mesh.userData = { 
+                    rotSpeedX: (Math.random() - 0.5) * 0.02,
+                    rotSpeedY: (Math.random() - 0.5) * 0.02,
+                    initialY: mesh.position.y
+                };
+
+                interactiveObjects.push(mesh);
+                scene.add(mesh);
+            }
+        }
+
+        function createHandSkeleton() {
+            // Criar 21 esferas para as articulações da mão
+            const jointGeometry = new THREE.SphereGeometry(0.02, 16, 16);
+            
+            for (let i = 0; i < 21; i++) {
+                const jointMaterial = new THREE.MeshStandardMaterial({
+                    color: i === 8 ? 0xff0055 : 0x00ffcc, // Destaque na ponta do indicador (8)
+                    emissive: i === 8 ? 0xaa0033 : 0x006644,
+                    roughness: 0.2
+                });
+                const jointMesh = new THREE.Mesh(jointGeometry, jointMaterial);
+                jointMesh.visible = false;
+                scene.add(jointMesh);
+                handJoints3D.push(jointMesh);
+            }
+
+            // Criar ossos (cilindros) para conectar as articulações
+            const boneMaterial = new THREE.MeshBasicMaterial({
+                color: 0x00ffaa,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            HAND_CONNECTIONS.forEach(() => {
+                const boneGeometry = new THREE.CylinderGeometry(0.008, 0.008, 1, 8);
+                const boneMesh = new THREE.Mesh(boneGeometry, boneMaterial);
+                boneMesh.visible = false;
+                scene.add(boneMesh);
+                handBones3D.push(boneMesh);
+            });
+        }
+
+        // --- MEDIAPIPE HAND TRACKING ---
+        function initHandTracking() {
+            try {
+                handDetector = new Hands({
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+                });
+
+                handDetector.setOptions({
+                    maxNumHands: 1,
+                    modelComplexity: 1,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+
+                handDetector.onResults(onHandResults);
+
+                // Inicializar Camera Utils do MediaPipe para alimentação robusta em loop
+                if (mediaPipeCamera) {
+                    mediaPipeCamera.stop();
+                }
+
+                mediaPipeCamera = new Camera(videoElement, {
+                    onFrame: async () => {
+                        if (videoElement && videoElement.readyState >= 2) {
+                            await handDetector.send({ image: videoElement });
+                        }
+                    },
+                    width: 640,
+                    height: 480
+                });
+
+                mediaPipeCamera.start();
+
+            } catch (err) {
+                logError("Falha ao iniciar MediaPipe Hands: " + err.message);
+            }
+        }
+
+        function onHandResults(results) {
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                updateStatus("Mão detectada!", "ok");
+                const landmarks = results.multiHandLandmarks[0];
+
+                // Atualizar posição das 21 articulações
+                for (let i = 0; i < landmarks.length; i++) {
+                    const lm = landmarks[i];
+
+                    // Mapeamento de coordenadas 2D do vídeo para o espaço 3D da cena
+                    const x = (lm.x - 0.5) * -3.6;
+                    const y = -(lm.y - 0.5) * 2.4;
+                    const z = -lm.z * 3 - 1.5;
+
+                    handJoints3D[i].position.set(x, y, z);
+                    handJoints3D[i].visible = true;
+                }
+
+                // Atualizar ossos/conexões entre as articulações
+                HAND_CONNECTIONS.forEach((connection, index) => {
+                    const startJoint = handJoints3D[connection[0]];
+                    const endJoint = handJoints3D[connection[1]];
+                    const bone = handBones3D[index];
+
+                    if (startJoint.visible && endJoint.visible) {
+                        const startPos = startJoint.position;
+                        const endPos = endJoint.position;
+
+                        const distance = startPos.distanceTo(endPos);
+                        bone.scale.set(1, distance, 1);
+
+                        // Posicionar o osso no ponto médio
+                        bone.position.copy(startPos).add(endPos).multiplyScalar(0.5);
+
+                        // Orientar o osso na direção da articulação final
+                        const orientation = new THREE.Matrix4();
+                        orientation.lookAt(startPos, endPos, new THREE.Vector3(0, 1, 0));
+                        bone.rotation.setFromRotationMatrix(orientation);
+                        bone.rotateX(Math.PI / 2); // Alinhar cilindro com a direção
+
+                        bone.visible = true;
+                    } else {
+                        bone.visible = false;
+                    }
+                });
+
+                // Checar toque com a ponta do indicador (Landmark 8)
+                if (handJoints3D[8]) {
+                    checkHandInteractions(handJoints3D[8].position);
+                }
+            } else {
+                updateStatus("Procurando mãos...", "loading");
+                handJoints3D.forEach(mesh => mesh.visible = false);
+                handBones3D.forEach(mesh => mesh.visible = false);
+            }
+        }
+
+        function checkHandInteractions(handPos) {
+            interactiveObjects.forEach(obj => {
+                const dist = handPos.distanceTo(obj.position);
+                if (dist < 0.3) {
+                    obj.rotation.x += 0.08;
+                    obj.rotation.y += 0.08;
+                    obj.scale.set(1.3, 1.3, 1.3);
                 } else {
-                    gameState.handDetected = false;
-                    DOM.trackingDot.className = "w-2.5 h-2.5 rounded-full bg-red-600";
-                    DOM.trackingText.textContent = "NO HAND";
-                    DOM.reticle.style.display = "none";
+                    obj.scale.set(1.0, 1.0, 1.0);
                 }
+            });
+        }
+
+        // --- RENDER LOOP ---
+        function animate(time) {
+            requestAnimationFrame(animate);
+
+            // Animar objetos
+            interactiveObjects.forEach((obj, idx) => {
+                obj.rotation.x += obj.userData.rotSpeedX;
+                obj.rotation.y += obj.userData.rotSpeedY;
+                obj.position.y = obj.userData.initialY + Math.sin(time * 0.002 + idx) * 0.08;
+            });
+
+            if (isVRMode) {
+                rendererLeft.render(scene, cameraLeft);
+                rendererRight.render(scene, cameraRight);
+            } else {
+                rendererLeft.render(scene, cameraLeft);
             }
         }
 
-        // Main Game Loop
-        let lastFrameTime = performance.now();
+        function onWindowResize() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
 
-        function gameLoop() {
-            requestAnimationFrame(gameLoop);
+            if (isVRMode) {
+                rendererLeft.setSize(width / 2, height);
+                rendererRight.setSize(width / 2, height);
+                cameraLeft.aspect = (width / 2) / height;
+                cameraRight.aspect = (width / 2) / height;
+            } else {
+                rendererLeft.setSize(width, height);
+                cameraLeft.aspect = width / height;
+            }
 
-            const now = performance.now();
-            const delta = Math.min((now - lastFrameTime) / 1000, 0.1); // Cap delta to prevent leaps
-            lastFrameTime = now;
+            cameraLeft.updateProjectionMatrix();
+            cameraRight.updateProjectionMatrix();
+        }
 
-            if (gameState.isRunning && !gameState.isPaused) {
-                // Process Hand Gesture Tracking
-                processHandTracking();
+        function toggleVRMode() {
+            isVRMode = !isVRMode;
+            if (isVRMode) {
+                container.classList.add('split-vr');
+                rightEye.style.display = 'block';
+            } else {
+                container.classList.remove('split-vr');
+                rightEye.style.display = 'none';
+            }
+            onWindowResize();
+        }
 
-                // Update Active Monsters
-                monsters.forEach(m => m.update(delta));
-
-                // Update Hit Particles
-                updateParticles(delta);
-
-                // Update Boss Health Bar
-                if (gameState.activeBoss && !gameState.activeBoss.isDead) {
-                    const hpPct = Math.max(0, (gameState.activeBoss.hp / gameState.activeBoss.maxHp) * 100);
-                    DOM.bossHpBar.style.width = `${hpPct}%`;
-                    DOM.bossHpText.textContent = `${Math.round(hpPct)}%`;
-                }
-
-                // Render Three.js Scene
-                renderer.render(scene, camera);
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => logError("Fullscreen negado: " + err.message));
+            } else if (document.exitFullscreen) {
+                document.exitFullscreen();
             }
         }
 
-        // Game State Controller Functions
-        function startGame() {
-            audioEngine.init();
-
-            gameState.isRunning = true;
-            gameState.isPaused = false;
-            gameState.score = 0;
-            gameState.wave = 1;
-            gameState.health = 100;
-            gameState.ammo = 12;
-            gameState.shotsFired = 0;
-            gameState.shotsHit = 0;
-
-            DOM.menuModal.classList.add('hidden');
-            DOM.hud.classList.remove('hidden');
-            DOM.hud.classList.add('flex');
-
-            startNextWave();
-        }
-
-        function gameOver() {
-            gameState.isRunning = false;
-
-            // Check high scores
-            if (gameState.score > gameState.highScore) {
-                gameState.highScore = gameState.score;
-                localStorage.setItem('ar_nightmare_highscore', gameState.highScore.toString());
+        // --- EVENTOS ---
+        btnStart.addEventListener('click', async () => {
+            if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+                logError("Atenção: A câmera exige protocolo seguro (HTTPS) na maioria dos celulares.");
             }
 
-            const accuracy = gameState.shotsFired > 0 
-                ? Math.round((gameState.shotsHit / gameState.shotsFired) * 100) 
-                : 0;
-
-            document.getElementById('final-score').textContent = gameState.score;
-            document.getElementById('final-wave').textContent = gameState.wave;
-            document.getElementById('final-accuracy').textContent = `${accuracy}%`;
-
-            DOM.hud.classList.add('hidden');
-            DOM.gameoverModal.classList.remove('hidden');
-            DOM.gameoverModal.classList.add('flex');
-        }
-
-        // Event Listeners & UI Binding
-        document.getElementById('start-btn').addEventListener('click', startGame);
-        
-        document.getElementById('restart-btn').addEventListener('click', () => {
-            DOM.gameoverModal.classList.add('hidden');
-            startGame();
-        });
-
-        DOM.reloadBtn.addEventListener('click', reloadAmmo);
-
-        document.getElementById('pause-btn').addEventListener('click', () => {
-            gameState.isPaused = true;
-            DOM.pauseModal.classList.remove('hidden');
-            DOM.pauseModal.classList.add('flex');
-        });
-
-        document.getElementById('resume-btn').addEventListener('click', () => {
-            gameState.isPaused = false;
-            DOM.pauseModal.classList.add('hidden');
-        });
-
-        document.getElementById('restart-pause-btn').addEventListener('click', () => {
-            DOM.pauseModal.classList.add('hidden');
-            startGame();
-        });
-
-        document.getElementById('quit-btn').addEventListener('click', () => {
-            gameState.isRunning = false;
-            gameState.isPaused = false;
-            DOM.pauseModal.classList.add('hidden');
-            DOM.hud.classList.add('hidden');
-            DOM.menuModal.classList.remove('hidden');
-
-            // Refresh High Scores display
-            DOM.menuHighScore.textContent = gameState.highScore;
-            DOM.menuMaxWave.textContent = gameState.maxWave;
-        });
-
-        // Settings Modal Binding
-        const settingsModal = DOM.settingsModal;
-        document.getElementById('settings-toggle-btn').addEventListener('click', () => {
-            settingsModal.classList.remove('hidden');
-            settingsModal.classList.add('flex');
-        });
-
-        document.getElementById('close-settings-btn').addEventListener('click', () => {
-            settingsModal.classList.add('hidden');
-        });
-
-        document.getElementById('save-settings-btn').addEventListener('click', () => {
-            settingsModal.classList.add('hidden');
-        });
-
-        // Audio Toggle
-        const audioBtn = document.getElementById('audio-toggle-btn');
-        audioBtn.addEventListener('click', () => {
-            gameState.audioEnabled = !gameState.audioEnabled;
-            audioBtn.textContent = gameState.audioEnabled ? 'ENABLED' : 'MUTED';
-            audioBtn.className = gameState.audioEnabled 
-                ? 'px-3 py-1 rounded-md glass-panel text-green-400 border-green-500/40 font-bold'
-                : 'px-3 py-1 rounded-md glass-panel text-red-400 border-red-500/40 font-bold';
-        });
-
-        // Sensitivity Slider
-        const sensSlider = document.getElementById('sens-slider');
-        const sensVal = document.getElementById('sens-val');
-        sensSlider.addEventListener('input', (e) => {
-            gameState.sensitivity = parseFloat(e.target.value);
-            sensVal.textContent = `${gameState.sensitivity.toFixed(1)}x`;
-        });
-
-        // Graphics Quality Selector
-        document.getElementById('graphics-select').addEventListener('change', (e) => {
-            gameState.graphicsQuality = e.target.value;
-            updateRendererSize();
-        });
-
-        // Handle Window Resize
-        window.addEventListener('resize', updateRendererSize);
-
-        // Fallback Touch Shooting for non-hand debug / alternate input
-        window.addEventListener('touchstart', (e) => {
-            if (gameState.isRunning && !gameState.isPaused && !gameState.handDetected) {
-                // Only shoot if tap is not on UI buttons
-                if (e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
-                    const touch = e.touches[0];
-                    shoot(touch.clientX, touch.clientY);
-                }
-            }
-        });
-
-        // System Initialization
-        window.onload = () => {
+            startModal.classList.add('hidden');
+            
             initThreeJS();
+            await startCamera("environment");
             initHandTracking();
-            gameLoop();
-        };
+            
+            if (!isInitialized) {
+                isInitialized = true;
+                animate(0);
+            }
+        });
+
+        btnSwitchCamera.addEventListener('click', switchCamera);
+        btnToggleVR.addEventListener('click', toggleVRMode);
+        btnFullscreen.addEventListener('click', toggleFullscreen);
     </script>
 </body>
 </html>
