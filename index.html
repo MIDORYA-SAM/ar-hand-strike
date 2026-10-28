@@ -2,268 +2,468 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#000000">
-  <title>VR Mobile — Hand Tracking</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#050812">
+<title>VR Mobile — Hand Tracking</title>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      -webkit-user-select: none;
-      user-select: none;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    html, body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #000;
-      color: #fff;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      overscroll-behavior: none;
-    }
-
-    #webcam, #canvas-3d {
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-    }
-
-    #webcam {
-      z-index: 1;
-      object-fit: cover;
-      background: #000;
-    }
-
-    #canvas-3d {
-      z-index: 2;
-      pointer-events: none;
-      display: block;
-    }
-
-    #vr-divider {
-      position: fixed;
-      top: 0;
-      left: 50%;
-      width: 2px;
-      height: 100%;
-      background: rgba(255,255,255,.5);
-      z-index: 6;
-      display: none;
-      pointer-events: none;
-    }
-
-    body.vr-mode #vr-divider {
-      display: block;
-    }
-
-    #ui-container {
-      position: fixed;
-      inset: 0;
-      z-index: 10;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      padding: max(12px, env(safe-area-inset-top)) 12px
-               max(14px, env(safe-area-inset-bottom));
-      pointer-events: none;
-    }
-
-    .hud-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      padding: 12px;
-      border-radius: 16px;
-      border: 1px solid rgba(255,255,255,.17);
-      background: rgba(0,0,0,.72);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-    }
-
-    .brand {
-      font-size: 12px;
-      font-weight: 800;
-      letter-spacing: 1.5px;
-      color: #00e5ff;
-    }
-
-    .score-badge {
-      font-size: 19px;
-      font-weight: 800;
-      color: #ffd700;
-      white-space: nowrap;
-    }
-
-    .status-badge {
-      font-size: 11px;
-      font-weight: 700;
-      text-align: center;
-      padding: 7px 10px;
-      border-radius: 30px;
-      background: #333;
-      color: #ddd;
-      max-width: 150px;
-    }
-
-    .status-badge.active {
-      color: #fff;
-      background: #147b46;
-      box-shadow: 0 0 12px rgba(0,255,120,.2);
-    }
-
-    .hud-bottom {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .hint {
-      padding: 8px 12px;
-      background: rgba(0,0,0,.65);
-      border-radius: 20px;
-      font-size: 11px;
-      text-align: center;
-      color: rgba(255,255,255,.85);
-    }
-
-    .hud-controls {
-      width: 100%;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 8px;
-      pointer-events: auto;
-    }
-
-    .btn {
-      appearance: none;
-      border: 1px solid rgba(255,255,255,.3);
-      background: rgba(15,20,30,.88);
-      color: white;
-      padding: 12px 15px;
-      border-radius: 30px;
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-    }
-
-    .btn:active {
-      transform: scale(.96);
-      background: #303a4b;
-    }
-
-    #msg-overlay {
-      position: fixed;
-      z-index: 30;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%,-50%);
-      width: min(88%, 380px);
-      padding: 18px;
-      border: 1px solid rgba(0,229,255,.4);
-      border-radius: 16px;
-      background: rgba(5,8,15,.96);
-      box-shadow: 0 0 35px rgba(0,229,255,.12);
-      text-align: center;
-      line-height: 1.5;
-      font-size: 14px;
-      overflow-wrap: anywhere;
-      display: none;
-      pointer-events: auto;
-    }
-
-    #msg-overlay button {
-      margin-top: 12px;
-      padding: 10px 18px;
-      border: 0;
-      border-radius: 20px;
-      background: #00bcd4;
-      color: #001014;
-      font-weight: 800;
-    }
-
-    .hand-legend {
-      display: flex;
-      gap: 12px;
-      font-size: 10px;
-      color: #eee;
-    }
-
-    .legend-dot {
-      display: inline-block;
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      margin-right: 4px;
-    }
-
-    @media (max-width: 380px) {
-      .brand { display: none; }
-      .btn { padding: 11px 12px; }
-      .status-badge { font-size: 10px; }
-    }
-  </style>
+<style>
+:root {
+  --cyan: #00eaff;
+  --green: #55ff9b;
+  --orange: #ff9b45;
+  --panel: rgba(5, 12, 25, .88);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; width: 100%; height: 100%;
+  overflow: hidden; background: #03060b;
+  color: white; font-family: system-ui, -apple-system, sans-serif;
+  touch-action: none;
+}
+#game, #camera, #hud, #errorBox, #menu {
+  position: fixed; inset: 0;
+}
+#game { z-index: 2; pointer-events: none; }
+#camera {
+  z-index: 1; width: 100%; height: 100%;
+  object-fit: cover; transform: scaleX(1);
+  background: #03060b;
+}
+#hud { z-index: 5; pointer-events: none; }
+#topbar {
+  position: absolute; top: max(12px, env(safe-area-inset-top));
+  left: 12px; right: 12px;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 8px;
+}
+.panel {
+  background: var(--panel); border: 1px solid #254257;
+  border-radius: 13px; padding: 10px 12px;
+  box-shadow: 0 0 18px #001b2a66;
+  backdrop-filter: blur(8px);
+}
+#score { font-size: 20px; font-weight: 850; color: var(--cyan); }
+.small { font-size: 11px; color: #a6c4d4; }
+#status { font-size: 12px; line-height: 1.5; }
+#crosshair {
+  position: absolute; left: 50%; top: 50%;
+  width: 18px; height: 18px; transform: translate(-50%,-50%);
+  border: 1px solid #00eaffaa; border-radius: 50%;
+}
+#crosshair:before, #crosshair:after {
+  content: ""; position: absolute; background: var(--cyan);
+}
+#crosshair:before { width: 1px; height: 28px; left: 8px; top: -6px; }
+#crosshair:after { height: 1px; width: 28px; top: 8px; left: -6px; }
+#bottom {
+  position: absolute; bottom: max(14px, env(safe-area-inset-bottom));
+  left: 12px; right: 12px;
+  display: flex; justify-content: space-between; align-items: end; gap: 8px;
+}
+#hint { max-width: 62%; font-size: 11px; color: #c5dbe8; }
+button {
+  color: white; background: #102536; border: 1px solid #28718a;
+  border-radius: 12px; padding: 11px 14px; font-size: 13px;
+  font-weight: 750; cursor: pointer; touch-action: manipulation;
+}
+button:active { transform: scale(.97); }
+button.primary { background: #006d83; border-color: var(--cyan); }
+button:disabled { opacity: .5; }
+#controls { display: flex; gap: 7px; pointer-events: auto; }
+#menu {
+  z-index: 20; display: flex; align-items: center; justify-content: center;
+  padding: 20px; background:
+    radial-gradient(ellipse at 50% 30%, #12334b 0%, #070e1b 45%, #020409 100%);
+}
+#menuCard {
+  width: min(100%, 440px); max-height: 90dvh; overflow: auto;
+  background: #08111fee; border: 1px solid #1c5367;
+  border-radius: 22px; padding: 22px;
+  box-shadow: 0 0 45px #00c8ff1a;
+}
+h1 { font-size: 27px; line-height: 1.1; margin: 0 0 7px; letter-spacing: 1px; }
+h1 span { color: var(--cyan); }
+#menuCard p { color: #aac2d2; font-size: 13px; line-height: 1.5; }
+.menuButtons { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 16px 0; }
+.menuButtons button { min-height: 48px; }
+#start { width: 100%; min-height: 52px; font-size: 15px; margin-top: 4px; }
+#startupStatus { min-height: 20px; color: var(--green); font-size: 12px; margin-top: 12px; }
+#permissionNote { font-size: 11px; color: #8faab9; }
+#errorBox {
+  z-index: 30; display: none; align-items: center; justify-content: center;
+  padding: 22px; background: #02050beF;
+}
+#errorContent {
+  max-width: 420px; width: 100%; padding: 20px;
+  border: 1px solid #763d46; background: #170c13;
+  border-radius: 16px;
+}
+#errorTitle { color: #ff8585; font-weight: 850; font-size: 19px; }
+#errorText { font-size: 13px; line-height: 1.6; color: #ead7df; white-space: pre-wrap; }
+#toast {
+  position: absolute; top: 25%; left: 50%; transform: translateX(-50%);
+  background: #061923eF; border: 1px solid var(--cyan);
+  border-radius: 12px; padding: 10px 16px; display: none;
+  color: white; font-weight: 800; white-space: nowrap;
+}
+#fireButton {
+  pointer-events: auto; border-radius: 50%; width: 64px; height: 64px;
+  padding: 0; background: #8d1726cc; border: 2px solid #ff707d;
+  font-size: 11px;
+}
+#modeLabel { color: var(--green); font-size: 11px; font-weight: 800; }
+@media (max-width: 360px) {
+  #hint { display: none; }
+  button { padding: 10px; font-size: 12px; }
+  #score { font-size: 17px; }
+}
+</style>
 </head>
 
 <body>
-  <video id="webcam" autoplay playsinline muted></video>
-  <canvas id="canvas-3d"></canvas>
-  <div id="vr-divider"></div>
+<video id="camera" autoplay playsinline muted></video>
+<div id="game"></div>
 
-  <div id="ui-container">
-    <div class="hud-header">
-      <div>
-        <div class="brand">HAND VR SYSTEM</div>
-        <div class="score-badge">🪙 <span id="score-val">0</span></div>
-      </div>
-
-      <div class="hand-legend">
-        <span><i class="legend-dot" style="background:#00e5ff"></i>Mão 1</span>
-        <span><i class="legend-dot" style="background:#ff9900"></i>Mão 2</span>
-      </div>
-
-      <div id="hand-status" class="status-badge">Inicializando...</div>
+<div id="hud">
+  <div id="topbar">
+    <div class="panel">
+      <div id="score">MOEDAS: 0</div>
+      <div class="small">VR MOBILE · HAND TRACKING</div>
+      <div id="modeLabel">MODO VR</div>
     </div>
-
-    <div class="hud-bottom">
-      <div class="hint">Use as pontas dos indicadores para coletar moedas</div>
-      <div class="hud-controls">
-        <button class="btn" id="btn-switch-cam">🔄 Câmera</button>
-        <button class="btn" id="btn-toggle-vr">🥽 Modo VR</button>
-        <button class="btn" id="btn-reset">↻ Reiniciar</button>
-      </div>
+    <div class="panel" id="status">
+      <div>Mãos: <b id="handsStatus">aguardando</b></div>
+      <div>Cabeça: <b id="headStatus">não ativada</b></div>
+      <div>Rifle: <b id="weaponStatus">pronto</b></div>
     </div>
   </div>
 
-  <div id="msg-overlay"></div>
+  <div id="crosshair"></div>
+  <div id="toast"></div>
 
-  <script>
-  (() => {
-    'use strict';
+  <div id="bottom">
+    <div id="hint" class="panel">
+      Mostre as mãos à câmera. Aproxime o polegar do indicador para disparar.
+      Toque em VR/AR para alternar a visualização.
+    </div>
+    <div id="controls">
+      <button id="switchMode">Mudar para AR</button>
+      <button id="fireButton">DISPARAR</button>
+    </div>
+  </div>
+</div>
 
-    // ==================================================
-    // CONFIGURAÇÕES
-    // ==================================================
+<div id="menu">
+  <div id="menuCard">
+    <h1>VR <span>MOBILE</span></h1>
+    <p>Rastreamento de duas mãos, moedas colecionáveis, rifle 3D e orientação da cabeça pelo iPhone.</p>
+    <div class="menuButtons">
+      <button id="vrButton" class="primary">🥽 Modo VR</button>
+      <button id="arButton">📷 Modo AR</button>
+      <button id="headButton">🧭 Ativar cabeça</button>
+      <button id="cameraButton">📸 Ativar câmera</button>
+    </div>
+    <button id="start" class="primary">INICIAR JOGO</button>
+    <div id="startupStatus">Pronto para iniciar.</div>
+    <p id="permissionNote">
+      Requer HTTPS e permissão para câmera. O iOS pode solicitar autorização
+      de movimento ao ativar o rastreamento de cabeça. VR usa visão dividida;
+      AR usa a câmera traseira como fundo.
+    </p>
+  </div>
+</div>
 
-    const MAX_HANDS = 2;
-    const NUM_COINS = 3;
-    const COIN_POINTS = 10;
+<div id="errorBox">
+  <div id="errorContent">
+    <div id="errorTitle">Não foi possível iniciar</div>
+    <p id="errorText"></p>
+    <button id="closeError" class="primary">VOLTAR</button>
+  </div>
+</div>
 
-    const HAND_CONNECTIONS = [
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
+<script>
+(() => {
+'use strict';
+
+const $ = id => document.getElementById(id);
+const video = $('camera');
+const gameRoot = $('game');
+
+const state = {
+  running: false,
+  cameraReady: false,
+  handsReady: false,
+  headReady: false,
+  headPermission: false,
+  mode: 'VR',
+  coins: 0,
+  hands: [],
+  pinch: [false, false],
+  lastShot: 0,
+  shotCooldown: 280,
+  lastFrame: 0,
+  animFrame: 0,
+  stream: null,
+  handsModel: null,
+  cameraStarting: false,
+  headStarting: false,
+  error: '',
+  toastUntil: 0,
+  renderWidth: 0,
+  renderHeight: 0
+};
+
+let renderer, scene, camera, leftCamera, rightCamera;
+let coinGroup, handGroup, effectsGroup, rifle;
+let coins = [];
+let rigs = [];
+let muzzleFlash;
+let raycaster;
+let audioCtx = null;
+let resizeObserver = null;
+
+const HEAD = { alpha: 0, beta: 0, gamma: 0, ready: false };
+const tempVec = new THREE.Vector3();
+const tempVec2 = new THREE.Vector3();
+const tempQuat = new THREE.Quaternion();
+
+function setStartup(message, error = false) {
+  $('startupStatus').textContent = message;
+  $('startupStatus').style.color = error ? '#ff8c8c' : '#55ff9b';
+}
+
+function showError(title, message) {
+  $('errorTitle').textContent = title;
+  $('errorText').textContent = message;
+  $('errorBox').style.display = 'flex';
+}
+
+function toast(message, duration = 1600) {
+  $('toast').textContent = message;
+  $('toast').style.display = 'block';
+  state.toastUntil = performance.now() + duration;
+}
+
+function updateHUD() {
+  $('score').textContent = 'MOEDAS: ' + state.coins;
+  $('handsStatus').textContent = state.hands.length
+    ? state.hands.length + ' detectada(s)'
+    : (state.handsReady ? 'procurando...' : 'não ativado');
+  $('headStatus').textContent = state.headReady ? 'ativo' : 'inativo';
+  $('weaponStatus').textContent = 'pronto';
+  $('modeLabel').textContent = 'MODO ' + state.mode;
+  $('switchMode').textContent = state.mode === 'VR' ? 'Mudar para AR' : 'Mudar para VR';
+}
+
+function makeMaterial(color, emissive = color, roughness = 0.35, metalness = 0.45) {
+  return new THREE.MeshStandardMaterial({
+    color, emissive, emissiveIntensity: 0.28, roughness, metalness
+  });
+}
+
+function makeBox(parent, name, size, position, material, rotation) {
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(size[0], size[1], size[2]), material
+  );
+  mesh.name = name;
+  mesh.position.set(position[0], position[1], position[2]);
+  if (rotation) mesh.rotation.set(rotation[0], rotation[1], rotation[2]);
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
+  parent.add(mesh);
+  return mesh;
+}
+
+function makeCylinder(parent, name, rTop, rBottom, height, position, material, rotation) {
+  const mesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(rTop, rBottom, height, 12),
+    material
+  );
+  mesh.name = name;
+  mesh.position.set(position[0], position[1], position[2]);
+  if (rotation) mesh.rotation.set(rotation[0], rotation[1], rotation[2]);
+  parent.add(mesh);
+  return mesh;
+}
+
+function initThree() {
+  if (!window.THREE) {
+    throw new Error('A biblioteca Three.js não carregou. Verifique a internet e recarregue a página.');
+  }
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x050a13);
+  scene.fog = new THREE.Fog(0x050a13, 8, 35);
+
+  camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 100);
+  camera.position.set(0, 0, 4);
+
+  leftCamera = new THREE.PerspectiveCamera(72, 0.5, 0.05, 100);
+  rightCamera = new THREE.PerspectiveCamera(72, 0.5, 0.05, 100);
+
+  renderer = new THREE.WebGLRenderer({
+    antialias: false,
+    alpha: true,
+    powerPreference: 'high-performance',
+    stencil: false,
+    depth: true
+  });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.setClearColor(0x000000, 0);
+  renderer.domElement.style.width = '100%';
+  renderer.domElement.style.height = '100%';
+  renderer.domElement.style.display = 'block';
+  gameRoot.appendChild(renderer.domElement);
+
+  scene.add(new THREE.HemisphereLight(0x8bdcff, 0x171020, 1.35));
+  const light = new THREE.DirectionalLight(0xffffff, 1.2);
+  light.position.set(3, 7, 5);
+  scene.add(light);
+
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(120, 120),
+    new THREE.MeshStandardMaterial({
+      color: 0x101827, roughness: 0.95, metalness: 0.05
+    })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -3.2;
+  scene.add(floor);
+
+  const grid = new THREE.GridHelper(120, 60, 0x123c50, 0x102334);
+  grid.position.y = -3.18;
+  scene.add(grid);
+
+  coinGroup = new THREE.Group();
+  handGroup = new THREE.Group();
+  effectsGroup = new THREE.Group();
+  scene.add(coinGroup, handGroup, effectsGroup);
+
+  raycaster = new THREE.Raycaster();
+
+  createRifle();
+  createHandRigs();
+  createCoins(18);
+  createEnvironment();
+
+  window.addEventListener('resize', onResize, { passive: true });
+  onResize();
+}
+
+function createEnvironment() {
+  // Pontos de luz e estruturas simples mantêm o cenário leve no iPhone.
+  const starMaterial = new THREE.MeshBasicMaterial({ color: 0x367a99 });
+  const starGeometry = new THREE.BufferGeometry();
+  const positions = [];
+  for (let i = 0; i < 280; i++) {
+    positions.push(
+      (Math.random() - 0.5) * 70,
+      (Math.random() - 0.5) * 35,
+      -Math.random() * 45 - 3
+    );
+  }
+  starGeometry.setAttribute('position',
+    new THREE.Float32BufferAttribute(positions, 3));
+  scene.add(new THREE.Points(starGeometry, starMaterial));
+
+  const pillarMaterial = makeMaterial(0x172c3b, 0x09202c);
+  for (let i = 0; i < 12; i++) {
+    const x = (i - 5.5) * 4;
+    makeBox(scene, 'pillar', [0.35, 3.4, 0.35],
+      [x, -1.5, -8 - (i % 3) * 4], pillarMaterial);
+  }
+}
+
+function createRifle() {
+  rifle = new THREE.Group();
+  rifle.name = 'Rifle3D';
+
+  const bodyMat = makeMaterial(0x202a35, 0x06111a, 0.28, 0.75);
+  const metalMat = makeMaterial(0x657786, 0x14232d, 0.22, 0.9);
+  const gripMat = makeMaterial(0x111820, 0x080c11, 0.8, 0.12);
+  const glowMat = new THREE.MeshBasicMaterial({ color: 0x00eaff });
+
+  makeBox(rifle, 'receiver', [0.23, 0.22, 0.62], [0, 0, 0], bodyMat);
+  makeBox(rifle, 'upper', [0.17, 0.08, 0.65], [0, 0.13, -0.01], metalMat);
+  makeBox(rifle, 'stock', [0.18, 0.15, 0.42], [0, -0.01, 0.47], bodyMat);
+  makeBox(rifle, 'stockPad', [0.2, 0.18, 0.07], [0, -0.01, 0.68], gripMat);
+  makeBox(rifle, 'barrel', [0.09, 0.09, 0.67], [0, 0.04, -0.58], metalMat);
+  makeCylinder(rifle, 'muzzle', 0.07, 0.07, 0.15,
+    [0, 0.04, -0.96], metalMat, [Math.PI / 2, 0, 0]);
+  makeBox(rifle, 'handguard', [0.16, 0.15, 0.42],
+    [0, 0.01, -0.45], bodyMat);
+  makeBox(rifle, 'grip', [0.13, 0.27, 0.16],
+    [0, -0.2, 0.1], gripMat, [-0.24, 0, 0]);
+  makeBox(rifle, 'magazine', [0.12, 0.27, 0.15],
+    [0, -0.22, -0.07], bodyMat, [-0.15, 0, 0]);
+  makeBox(rifle, 'sightRail', [0.06, 0.035, 0.43],
+    [0, 0.2, -0.25], metalMat);
+  makeBox(rifle, 'frontSight', [0.035, 0.12, 0.035],
+    [0, 0.26, -0.68], metalMat);
+  makeBox(rifle, 'energyStrip', [0.025, 0.035, 0.38],
+    [0.095, 0.11, -0.38], glowMat);
+
+  const optic = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.055, 0.055, 0.13, 12),
+    metalMat
+  );
+  optic.rotation.x = Math.PI / 2;
+  optic.position.set(0, 0.24, -0.1);
+  rifle.add(optic);
+
+  const lens = new THREE.Mesh(
+    new THREE.CircleGeometry(0.04, 12),
+    new THREE.MeshBasicMaterial({
+      color: 0x00dfff, transparent: true, opacity: 0.85
+    })
+  );
+  lens.position.set(0, 0.24, -0.17);
+  rifle.add(lens);
+
+  // Rifle permanece preso à câmera, como arma em primeira pessoa.
+  rifle.position.set(0.36, -0.34, -0.75);
+  rifle.rotation.set(-0.07, -0.12, -0.03);
+  camera.add(rifle);
+  scene.add(camera);
+
+  muzzleFlash = new THREE.Mesh(
+    new THREE.SphereGeometry(0.105, 8, 6),
+    new THREE.MeshBasicMaterial({
+      color: 0x8cffff, transparent: true, opacity: 0
+    })
+  );
+  muzzleFlash.position.set(0.36, -0.3, -1.76);
+  camera.add(muzzleFlash);
+}
+
+function createHandRigs() {
+  const colors = [0x00eaff, 0xffa34d];
+  for (let h = 0; h < 2; h++) {
+    const root = new THREE.Group();
+    const joints = [];
+    const bones = [];
+
+    const jointMaterial = new THREE.MeshStandardMaterial({
+      color: colors[h], emissive: colors[h],
+      emissiveIntensity: 0.5, roughness: 0.3
+    });
+
+    for (let i = 0; i < 21; i++) {
+      const joint = new THREE.Mesh(
+        new THREE.SphereGeometry(i === 8 ? 0.075 : 0.045, 8, 6),
+        jointMaterial
+      );
+      root.add(joint);
+      joints.push(joint);
+    }
+
+    const connections = [
       [0,1],[1,2],[2,3],[3,4],
       [0,5],[5,6],[6,7],[7,8],
       [5,9],[9,10],[10,11],[11,12],
@@ -272,597 +472,577 @@
       [0,17]
     ];
 
-    let score = 0;
-    let isVRMode = false;
-    let facingMode = 'environment';
-
-    let scene = null;
-    let camera3D = null;
-    let renderer = null;
-    let video = null;
-    let detector = null;
-    let cameraUtils = null;
-
-    let initialized = false;
-    let switchingCamera = false;
-    let processingFrame = false;
-    let lastFrameTime = 0;
-    let cameraGeneration = 0;
-    let errorTimer = null;
-
-    const handRigs = [];
-    const coins = [];
-
-    const statusElement = document.getElementById('hand-status');
-    const scoreElement = document.getElementById('score-val');
-    const errorElement = document.getElementById('msg-overlay');
-
-    // ==================================================
-    // UTILITÁRIOS
-    // ==================================================
-
-    function setStatus(message, active = false) {
-      statusElement.textContent = message;
-      statusElement.classList.toggle('active', active);
+    for (const [a,b] of connections) {
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.018, 0.018, 1, 5),
+        jointMaterial
+      );
+      root.add(mesh);
+      bones.push({ mesh, a, b });
     }
 
-    function showError(message) {
-      errorElement.replaceChildren();
+    root.visible = false;
+    handGroup.add(root);
+    rigs.push({ root, joints, bones });
+  }
+}
 
-      const text = document.createElement('div');
-      text.textContent = message;
-      errorElement.appendChild(text);
+function createCoins(count) {
+  const gold = new THREE.MeshStandardMaterial({
+    color: 0xffca43, emissive: 0x9a4e00,
+    emissiveIntensity: 0.55, metalness: 0.85, roughness: 0.22
+  });
+  const edge = new THREE.MeshStandardMaterial({
+    color: 0xffef9b, metalness: 0.9, roughness: 0.18
+  });
 
-      const close = document.createElement('button');
-      close.textContent = 'Fechar';
-      close.onclick = () => {
-        errorElement.style.display = 'none';
+  for (let i = 0; i < count; i++) {
+    const group = new THREE.Group();
+    const disc = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.19, 0.19, 0.055, 20),
+      gold
+    );
+    disc.rotation.x = Math.PI / 2;
+    group.add(disc);
+
+    const inner = new THREE.Mesh(
+      new THREE.TorusGeometry(0.13, 0.018, 5, 18),
+      edge
+    );
+    group.add(inner);
+
+    group.position.set(
+      (Math.random() - 0.5) * 8,
+      (Math.random() - 0.5) * 4,
+      -3 - Math.random() * 15
+    );
+    group.userData = {
+      baseY: group.position.y,
+      phase: Math.random() * Math.PI * 2,
+      active: true
+    };
+    coinGroup.add(group);
+    coins.push(group);
+  }
+}
+
+function respawnCoin(coin) {
+  coin.position.set(
+    (Math.random() - 0.5) * 8,
+    (Math.random() - 0.5) * 4,
+    -4 - Math.random() * 18
+  );
+  coin.userData.baseY = coin.position.y;
+  coin.userData.phase = Math.random() * Math.PI * 2;
+}
+
+function onResize() {
+  if (!renderer || !camera) return;
+  const w = Math.max(1, window.innerWidth);
+  const h = Math.max(1, window.innerHeight);
+
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+
+  leftCamera.aspect = (w / 2) / h;
+  rightCamera.aspect = (w / 2) / h;
+  leftCamera.fov = rightCamera.fov = 72;
+  leftCamera.updateProjectionMatrix();
+  rightCamera.updateProjectionMatrix();
+
+  renderer.setSize(w, h, false);
+  state.renderWidth = w;
+  state.renderHeight = h;
+}
+
+function syncStereoCameras() {
+  camera.updateMatrixWorld(true);
+  leftCamera.position.copy(camera.position);
+  rightCamera.position.copy(camera.position);
+  leftCamera.quaternion.copy(camera.quaternion);
+  rightCamera.quaternion.copy(camera.quaternion);
+
+  const eyeSeparation = 0.032;
+  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+  leftCamera.position.addScaledVector(right, -eyeSeparation);
+  rightCamera.position.addScaledVector(right, eyeSeparation);
+
+  leftCamera.updateMatrixWorld(true);
+  rightCamera.updateMatrixWorld(true);
+}
+
+function renderFrame() {
+  if (!renderer || !scene || !camera) return;
+
+  if (state.mode === 'VR') {
+    syncStereoCameras();
+    renderer.setScissorTest(true);
+    renderer.setViewport(0, 0, state.renderWidth, state.renderHeight);
+    renderer.setScissor(0, 0, Math.floor(state.renderWidth / 2), state.renderHeight);
+    renderer.render(scene, leftCamera);
+    renderer.setViewport(Math.floor(state.renderWidth / 2), 0,
+      state.renderWidth - Math.floor(state.renderWidth / 2), state.renderHeight);
+    renderer.setScissor(Math.floor(state.renderWidth / 2), 0,
+      state.renderWidth - Math.floor(state.renderWidth / 2), state.renderHeight);
+    renderer.render(scene, rightCamera);
+    renderer.setScissorTest(false);
+  } else {
+    renderer.setViewport(0, 0, state.renderWidth, state.renderHeight);
+    renderer.setScissorTest(false);
+    renderer.render(scene, camera);
+  }
+}
+
+function onHeadOrientation(event) {
+  // iOS/Android entregam ângulos em graus. Valores nulos não substituem
+  // o último valor válido do sensor.
+  if (Number.isFinite(event.alpha)) HEAD.alpha = event.alpha;
+  if (Number.isFinite(event.beta)) HEAD.beta = event.beta;
+  if (Number.isFinite(event.gamma)) HEAD.gamma = event.gamma;
+
+  if (!HEAD.ready) {
+    HEAD.ready = true;
+    state.headReady = true;
+    updateHUD();
+    toast('Rastreamento de cabeça ativo');
+  }
+
+  // Alpha = rotação horizontal; beta/gamma inclinam a visão.
+  // Suavização para reduzir tremores do sensor.
+  const deg = Math.PI / 180;
+  const target = new THREE.Euler(
+    THREE.MathUtils.clamp((HEAD.beta - 90) * deg, -1.05, 1.05),
+    -HEAD.alpha * deg,
+    -HEAD.gamma * deg,
+    'YXZ'
+  );
+  tempQuat.setFromEuler(target);
+  camera.quaternion.slerp(tempQuat, 0.16);
+}
+
+async function enableHeadTracking() {
+  if (state.headStarting || state.headReady) return;
+  state.headStarting = true;
+
+  try {
+    if (!('DeviceOrientationEvent' in window)) {
+      throw new Error('Este navegador não oferece DeviceOrientationEvent.');
+    }
+
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      const permission = await DeviceOrientationEvent.requestPermission();
+      if (permission !== 'granted') {
+        throw new Error('Permissão de movimento negada. Ative-a e tente novamente.');
+      }
+    }
+
+    window.addEventListener('deviceorientation', onHeadOrientation, true);
+    state.headPermission = true;
+    setStartup('Permissão de orientação concedida. Movimente o iPhone.');
+    toast('Movimente o iPhone para calibrar');
+  } catch (err) {
+    state.headReady = false;
+    $('headStatus').textContent = 'indisponível';
+    setStartup('Sensor: ' + (err.message || 'não foi possível ativar.'), true);
+    showError('Sensor de cabeça indisponível',
+      (err.message || String(err)) +
+      '\n\nNo iPhone, abra o jogo em HTTPS e toque em “Ativar cabeça”.');
+  } finally {
+    state.headStarting = false;
+    updateHUD();
+  }
+}
+
+async function startCamera() {
+  if (state.cameraStarting || state.cameraReady) return;
+  state.cameraStarting = true;
+  setStartup('Solicitando acesso à câmera...');
+
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('Câmera indisponível. Use Safari em HTTPS ou um navegador compatível.');
+    }
+
+    state.stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        frameRate: { ideal: 24, max: 30 }
+      }
+    });
+
+    video.srcObject = state.stream;
+    await new Promise((resolve, reject) => {
+      if (video.readyState >= 2) return resolve();
+      const timer = setTimeout(() => reject(
+        new Error('A câmera demorou demais para iniciar.')), 12000);
+      video.onloadedmetadata = () => {
+        clearTimeout(timer);
+        resolve();
       };
-
-      errorElement.appendChild(close);
-      errorElement.style.display = 'block';
-
-      clearTimeout(errorTimer);
-      errorTimer = setTimeout(() => {
-        errorElement.style.display = 'none';
-      }, 9000);
-    }
-
-    // ==================================================
-    // MOTOR 3D
-    // ==================================================
-
-    function init3D() {
-      const canvas = document.getElementById('canvas-3d');
-
-      scene = new THREE.Scene();
-
-      camera3D = new THREE.PerspectiveCamera(
-        60,
-        window.innerWidth / window.innerHeight,
-        0.1,
-        100
-      );
-
-      camera3D.position.set(0, 0, 0);
-
-      renderer = new THREE.WebGLRenderer({
-        canvas,
-        alpha: true,
-        antialias: false,
-        powerPreference: 'high-performance'
-      });
-
-      renderer.setPixelRatio(
-        Math.min(window.devicePixelRatio || 1, 1.5)
-      );
-
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setClearColor(0x000000, 0);
-      renderer.autoClear = true;
-
-      scene.add(new THREE.AmbientLight(0xffffff, 1.1));
-
-      const light = new THREE.DirectionalLight(0xffffff, 1.2);
-      light.position.set(0, 5, 8);
-      scene.add(light);
-
-      for (let i = 0; i < MAX_HANDS; i++) {
-        createHandRig(i);
-      }
-
-      createCoins();
-
-      window.addEventListener('resize', resize3D);
-    }
-
-    // ==================================================
-    // ESQUELETOS INDEPENDENTES
-    // ==================================================
-
-    function createHandRig(handIndex) {
-      const joints = [];
-      const bones = [];
-
-      const color = handIndex === 0 ? 0x00e5ff : 0xff9900;
-
-      const jointMaterial = new THREE.MeshStandardMaterial({
-        color: color,
-        emissive: color,
-        emissiveIntensity: 0.12,
-        roughness: 0.25,
-        metalness: 0.4
-      });
-
-      const indexMaterial = new THREE.MeshStandardMaterial({
-        color: 0xff0055,
-        emissive: 0xff0055,
-        emissiveIntensity: 0.7
-      });
-
-      const jointGeometry = new THREE.SphereGeometry(0.065, 10, 8);
-      const indexGeometry = new THREE.SphereGeometry(0.11, 12, 10);
-
-      for (let i = 0; i < 21; i++) {
-        const joint = new THREE.Mesh(
-          i === 8 ? indexGeometry : jointGeometry,
-          i === 8 ? indexMaterial : jointMaterial
-        );
-
-        joint.visible = false;
-        scene.add(joint);
-        joints.push(joint);
-      }
-
-      const boneMaterial = new THREE.MeshBasicMaterial({
-        color: color,
-        transparent: true,
-        opacity: 0.85,
-        depthWrite: false
-      });
-
-      const boneGeometry = new THREE.CylinderGeometry(
-        0.025, 0.025, 1, 6
-      );
-
-      for (let i = 0; i < HAND_CONNECTIONS.length; i++) {
-        const bone = new THREE.Mesh(boneGeometry, boneMaterial);
-
-        bone.visible = false;
-        scene.add(bone);
-        bones.push(bone);
-      }
-
-      handRigs.push({ joints, bones });
-    }
-
-    function hideHand(index) {
-      const rig = handRigs[index];
-      if (!rig) return;
-
-      rig.joints.forEach(joint => {
-        joint.visible = false;
-      });
-
-      rig.bones.forEach(bone => {
-        bone.visible = false;
-      });
-    }
-
-    function hideAllHands() {
-      for (let i = 0; i < MAX_HANDS; i++) {
-        hideHand(i);
-      }
-    }
-
-    // ==================================================
-    // COORDENADAS DA CÂMERA PARA O ESPAÇO 3D
-    // ==================================================
-
-    function landmarkToWorld(lm) {
-      const z = -5;
-
-      const visibleHeight =
-        2 * Math.tan(THREE.MathUtils.degToRad(camera3D.fov / 2))
-        * Math.abs(z);
-
-      const visibleWidth = visibleHeight * camera3D.aspect;
-
-      // A câmera frontal aparece espelhada no vídeo.
-      const xNormalized = facingMode === 'user'
-        ? 0.5 - lm.x
-        : lm.x - 0.5;
-
-      return new THREE.Vector3(
-        xNormalized * visibleWidth,
-        (0.5 - lm.y) * visibleHeight,
-        z
-      );
-    }
-
-    // ==================================================
-    // ATUALIZAR CADA MÃO
-    // ==================================================
-
-    function updateHand(handIndex, landmarks) {
-      const rig = handRigs[handIndex];
-
-      if (!landmarks || landmarks.length < 21) {
-        hideHand(handIndex);
-        return;
-      }
-
-      for (let i = 0; i < 21; i++) {
-        rig.joints[i].position.copy(
-          landmarkToWorld(landmarks[i])
-        );
-        rig.joints[i].visible = true;
-      }
-
-      for (let i = 0; i < HAND_CONNECTIONS.length; i++) {
-        const connection = HAND_CONNECTIONS[i];
-        const start = rig.joints[connection[0]].position;
-        const end = rig.joints[connection[1]].position;
-        const bone = rig.bones[i];
-
-        const direction = new THREE.Vector3()
-          .subVectors(end, start);
-
-        const length = direction.length();
-
-        if (length < 0.001) {
-          bone.visible = false;
-          continue;
-        }
-
-        bone.position.copy(start).add(end).multiplyScalar(0.5);
-
-        bone.quaternion.setFromUnitVectors(
-          new THREE.Vector3(0, 1, 0),
-          direction.normalize()
-        );
-
-        bone.scale.set(1, length, 1);
-        bone.visible = true;
-      }
-
-      // Cada mão verifica a ponta do próprio indicador.
-      checkCollisions(rig.joints[8].position);
-    }
-
-    // ==================================================
-    // RESULTADOS DO MEDIAPIPE
-    // ==================================================
-
-    function onHandResults(results) {
-      const landmarks = results.multiHandLandmarks || [];
-      const count = Math.min(landmarks.length, MAX_HANDS);
-
-      for (let i = 0; i < MAX_HANDS; i++) {
-        if (i < count) {
-          updateHand(i, landmarks[i]);
-        } else {
-          hideHand(i);
-        }
-      }
-
-      if (count === 0) {
-        setStatus('Nenhuma mão detectada', false);
-      } else if (count === 1) {
-        setStatus('1 mão detectada', true);
-      } else {
-        setStatus('2 mãos detectadas', true);
-      }
-    }
-
-    // ==================================================
-    // MOEDAS
-    // ==================================================
-
-    function createCoins() {
-      const geometry = new THREE.CylinderGeometry(
-        0.24, 0.24, 0.07, 24
-      );
-
-      const material = new THREE.MeshStandardMaterial({
-        color: 0xffd700,
-        metalness: 0.85,
-        roughness: 0.2,
-        emissive: 0x996600,
-        emissiveIntensity: 0.3
-      });
-
-      for (let i = 0; i < NUM_COINS; i++) {
-        const coin = new THREE.Mesh(geometry, material);
-
-        coin.rotation.x = Math.PI / 2;
-        coin.userData.floatOffset = i * 2.1;
-
-        resetCoin(coin);
-
-        scene.add(coin);
-        coins.push(coin);
-      }
-    }
-
-    function resetCoin(coin) {
-      coin.position.set(
-        (Math.random() - 0.5) * 5,
-        (Math.random() - 0.5) * 3.5,
-        -5
-      );
-    }
-
-    function checkCollisions(tipPosition) {
-      for (const coin of coins) {
-        if (coin.position.distanceTo(tipPosition) < 0.38) {
-          score += COIN_POINTS;
-          scoreElement.textContent = String(score);
-
-          resetCoin(coin);
-        }
-      }
-    }
-
-    function resetGame() {
-      score = 0;
-      scoreElement.textContent = '0';
-
-      coins.forEach(resetCoin);
-      hideAllHands();
-    }
-
-    // ==================================================
-    // CÂMERA
-    // ==================================================
-
-    async function stopCamera() {
-      const oldCamera = cameraUtils;
-      cameraUtils = null;
-
-      if (oldCamera) {
-        try {
-          oldCamera.stop();
-        } catch (error) {
-          console.warn('Não foi possível parar a câmera:', error);
-        }
-      }
-
-      if (video && video.srcObject) {
-        video.srcObject.getTracks().forEach(track => track.stop());
-        video.srcObject = null;
-      }
-
-      hideAllHands();
-    }
-
-    async function startCamera(mode) {
-      if (switchingCamera || !detector) return;
-
-      switchingCamera = true;
-      const generation = ++cameraGeneration;
-
-      setStatus('Iniciando câmera...', false);
-
-      try {
-        await stopCamera();
-
-        if (generation !== cameraGeneration) return;
-
-        facingMode = mode;
-
-        video.style.transform = mode === 'user'
-          ? 'scaleX(-1)'
-          : 'scaleX(1)';
-
-        cameraUtils = new Camera(video, {
-          width: 640,
-          height: 480,
-          facingMode: mode,
-
-          onFrame: async () => {
-            if (
-              generation !== cameraGeneration ||
-              !detector ||
-              !video.videoWidth ||
-              processingFrame
-            ) {
-              return;
-            }
-
-            const now = performance.now();
-
-            // Limita o processamento para melhorar o desempenho.
-            if (now - lastFrameTime < 33) return;
-
-            lastFrameTime = now;
-            processingFrame = true;
-
-            try {
-              await detector.send({ image: video });
-            } catch (error) {
-              console.warn('Erro ao processar imagem:', error);
-            } finally {
-              processingFrame = false;
-            }
-          }
-        });
-
-        await cameraUtils.start();
-
-        if (generation === cameraGeneration) {
-          setStatus('Câmera ativa — procurando mãos', false);
-        }
-      } catch (error) {
-        console.error('Erro de câmera:', error);
-
-        if (generation === cameraGeneration) {
-          setStatus('Câmera indisponível', false);
-
-          showError(
-            'Não foi possível abrir a câmera. Permita o acesso nas ' +
-            'configurações do Safari e abra o jogo por HTTPS. Detalhe: ' +
-            (error.message || 'erro desconhecido')
-          );
-        }
-      } finally {
-        switchingCamera = false;
-      }
-    }
-
-    async function initMediaPipe() {
-      if (typeof Hands === 'undefined' || typeof Camera === 'undefined') {
-        setStatus('Falha ao carregar MediaPipe', false);
-
-        showError(
-          'Não foi possível carregar os arquivos do MediaPipe. ' +
-          'Verifique sua conexão com a internet e recarregue a página.'
-        );
-
-        return;
-      }
-
-      try {
-        detector = new Hands({
-          locateFile: file =>
-            'https://cdn.jsdelivr.net/npm/@mediapipe/hands/' + file
-        });
-
-        detector.setOptions({
-          maxNumHands: MAX_HANDS,
-          modelComplexity: 1,
-          minDetectionConfidence: 0.6,
-          minTrackingConfidence: 0.6
-        });
-
-        detector.onResults(onHandResults);
-
-        await startCamera(facingMode);
-      } catch (error) {
-        console.error('Erro no MediaPipe:', error);
-        setStatus('Falha no rastreamento', false);
-
-        showError(
-          'Erro ao inicializar o rastreamento: ' +
-          (error.message || 'erro desconhecido')
-        );
-      }
-    }
-
-    // ==================================================
-    // REDIMENSIONAMENTO E VR
-    // ==================================================
-
-    function resize3D() {
-      if (!renderer || !camera3D) return;
-
-      camera3D.aspect = window.innerWidth / window.innerHeight;
-      camera3D.updateProjectionMatrix();
-
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    }
-
-    function animate() {
-      requestAnimationFrame(animate);
-
-      if (!renderer || !scene || !camera3D) return;
-
-      const time = performance.now() * 0.001;
-
-      coins.forEach(coin => {
-        coin.rotation.y += 0.025;
-        coin.position.y +=
-          Math.sin(time * 2 + coin.userData.floatOffset) * 0.001;
-      });
-
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-
-      if (isVRMode) {
-        const half = Math.floor(width / 2);
-
-        renderer.setScissorTest(true);
-
-        renderer.setViewport(0, 0, half, height);
-        renderer.setScissor(0, 0, half, height);
-        renderer.render(scene, camera3D);
-
-        renderer.setViewport(half, 0, width - half, height);
-        renderer.setScissor(half, 0, width - half, height);
-        renderer.render(scene, camera3D);
-
-        renderer.setScissorTest(false);
-      } else {
-        renderer.setViewport(0, 0, width, height);
-        renderer.setScissorTest(false);
-        renderer.render(scene, camera3D);
-      }
-    }
-
-    // ==================================================
-    // BOTÕES
-    // ==================================================
-
-    document.getElementById('btn-switch-cam').addEventListener('click', async () => {
-      if (switchingCamera) return;
-
-      const nextMode = facingMode === 'environment'
-        ? 'user'
-        : 'environment';
-
-      await startCamera(nextMode);
+      video.onerror = () => {
+        clearTimeout(timer);
+        reject(new Error('Falha ao carregar o vídeo da câmera.'));
+      };
     });
 
-    document.getElementById('btn-toggle-vr').addEventListener('click', () => {
-      isVRMode = !isVRMode;
+    await video.play();
+    state.cameraReady = true;
+    video.style.display = state.mode === 'AR' ? 'block' : 'none';
+    setStartup('Câmera ativa.');
+    await startHandsModel();
+  } catch (err) {
+    setStartup('Erro na câmera: ' + (err.message || String(err)), true);
+    showError('Câmera indisponível',
+      (err.message || String(err)) +
+      '\n\nVerifique a permissão de câmera em Ajustes > Safari e tente novamente.');
+  } finally {
+    state.cameraStarting = false;
+    updateHUD();
+  }
+}
 
-      document.body.classList.toggle('vr-mode', isVRMode);
+async function startHandsModel() {
+  if (state.handsReady) return;
+  if (!window.Hands) {
+    throw new Error('MediaPipe Hands não carregou. Verifique a conexão e recarregue.');
+  }
 
-      document.getElementById('btn-toggle-vr').textContent =
-        isVRMode ? '📱 Sair do VR' : '🥽 Modo VR';
+  const hands = new Hands({
+    locateFile: file => 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/' + file
+  });
 
-      resize3D();
-    });
+  hands.setOptions({
+    maxNumHands: 2,
+    modelComplexity: 0,
+    minDetectionConfidence: 0.55,
+    minTrackingConfidence: 0.55,
+    selfieMode: false
+  });
 
-    document.getElementById('btn-reset').addEventListener('click', resetGame);
+  hands.onResults(onHandsResults);
+  state.handsModel = hands;
+  state.handsReady = true;
+  setStartup('Rastreamento de duas mãos ativo.');
+}
 
-    // ==================================================
-    // INICIALIZAÇÃO SEGURA
-    // ==================================================
+function onHandsResults(results) {
+  const landmarks = results.multiHandLandmarks || [];
+  const handCount = Math.min(2, landmarks.length);
+  state.hands = [];
 
-    async function init() {
-      if (initialized) return;
-      initialized = true;
+  for (let h = 0; h < 2; h++) {
+    const rig = rigs[h];
+    if (h >= handCount) {
+      rig.root.visible = false;
+      state.pinch[h] = false;
+      continue;
+    }
 
-      try {
-        video = document.getElementById('webcam');
+    const lm = landmarks[h];
+    rig.root.visible = true;
+    const mapped = [];
 
-        if (typeof THREE === 'undefined') {
-          throw new Error('Three.js não foi carregado.');
-        }
+    for (let i = 0; i < 21; i++) {
+      // A câmera captura mãos no espaço da imagem. Convertemos para
+      // coordenadas aproximadas da cena 3D à frente da câmera.
+      const x = (0.5 - lm[i].x) * 5.4;
+      const y = (0.5 - lm[i].y) * 3.5;
+      const z = -1.5 - (lm[i].z || 0) * 2.0;
+      mapped.push(new THREE.Vector3(x, y, z));
+      rig.joints[i].position.copy(mapped[i]);
+    }
 
-        init3D();
-        animate();
+    for (const bone of rig.bones) {
+      const a = mapped[bone.a], b = mapped[bone.b];
+      const delta = tempVec.copy(b).sub(a);
+      const length = delta.length();
+      bone.mesh.position.copy(a).addScaledVector(delta, 0.5);
+      bone.mesh.scale.set(1, Math.max(length, 0.001), 1);
+      bone.mesh.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0), delta.normalize()
+      );
+    }
 
-        await initMediaPipe();
-      } catch (error) {
-        console.error('Falha na inicialização:', error);
+    const thumb = lm[4];
+    const index = lm[8];
+    const distance = Math.hypot(thumb.x - index.x, thumb.y - index.y);
+    const isPinching = distance < 0.052;
 
-        setStatus('Erro ao iniciar jogo', false);
+    if (isPinching && !state.pinch[h]) {
+      shoot('pinch');
+    }
+    state.pinch[h] = isPinching;
 
-        showError(
-          'O jogo não conseguiu iniciar. Confira sua conexão e recarregue. ' +
-          (error.message || '')
-        );
+    state.hands.push({ landmarks: lm, points: mapped });
+  }
+
+  updateHUD();
+}
+
+function initAudio() {
+  if (audioCtx) return;
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (AudioContext) audioCtx = new AudioContext();
+  } catch (_) {}
+}
+
+function playShotSound() {
+  if (!audioCtx) return;
+  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+
+  try {
+    const now = audioCtx.currentTime;
+    const oscillator = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    oscillator.type = 'sawtooth';
+    oscillator.frequency.setValueAtTime(170, now);
+    oscillator.frequency.exponentialRampToValueAtTime(42, now + 0.11);
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+    oscillator.connect(gain);
+    gain.connect(audioCtx.destination);
+    oscillator.start(now);
+    oscillator.stop(now + 0.14);
+  } catch (_) {}
+}
+
+function createTracer() {
+  const start = new THREE.Vector3(0.36, -0.3, -1.75);
+  camera.localToWorld(start);
+  const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  const end = start.clone().addScaledVector(direction, 16);
+
+  const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+  const material = new THREE.LineBasicMaterial({
+    color: 0x75faff, transparent: true, opacity: 0.9
+  });
+  const line = new THREE.Line(geometry, material);
+  line.userData.life = 0.12;
+  effectsGroup.add(line);
+
+  const light = new THREE.PointLight(0x00eaff, 2, 3);
+  light.position.copy(start);
+  effectsGroup.add(light);
+  light.userData.life = 0.08;
+}
+
+function shoot(source) {
+  if (!state.running) {
+    toast('Toque em INICIAR JOGO primeiro');
+    return;
+  }
+
+  const now = performance.now();
+  if (now - state.lastShot < state.shotCooldown) return;
+  state.lastShot = now;
+
+  initAudio();
+  playShotSound();
+
+  if (muzzleFlash) {
+    muzzleFlash.material.opacity = 1;
+    muzzleFlash.scale.setScalar(1 + Math.random() * 0.7);
+  }
+  rifle.rotation.x = -0.04;
+  setTimeout(() => {
+    if (rifle) rifle.rotation.x = -0.07;
+  }, 80);
+
+  createTracer();
+  $('weaponStatus').textContent = 'disparo';
+  toast('DISPARO!', 450);
+
+  // O disparo também pode coletar moedas que estejam na mira.
+  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+  const activeCoins = coins.filter(c => c.visible);
+  const hits = raycaster.intersectObjects(activeCoins, true);
+
+  if (hits.length) {
+    let target = hits[0].object;
+    while (target.parent && target.parent !== coinGroup) {
+      target = target.parent;
+    }
+    if (target.parent === coinGroup) {
+      state.coins++;
+      respawnCoin(target);
+      updateHUD();
+      toast('MOEDA COLETADA!', 900);
+    }
+  }
+}
+
+function collectCoins(time) {
+  const activePoints = [];
+  for (const hand of state.hands) {
+    if (hand.points && hand.points[8]) activePoints.push(hand.points[8]);
+  }
+
+  for (const coin of coins) {
+    coin.rotation.y += 0.018;
+    coin.rotation.z += 0.006;
+    coin.position.y = coin.userData.baseY +
+      Math.sin(time * 0.0018 + coin.userData.phase) * 0.16;
+
+    for (const point of activePoints) {
+      // Ponta do indicador pode apanhar uma moeda próxima.
+      if (coin.position.distanceTo(point) < 0.38) {
+        state.coins++;
+        respawnCoin(coin);
+        updateHUD();
+        toast('+1 MOEDA', 650);
+        break;
       }
     }
+  }
+}
 
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', init, { once: true });
-    } else {
-      init();
+async function frame(now) {
+  state.animFrame = requestAnimationFrame(frame);
+  if (!state.running || !renderer) return;
+
+  const delta = Math.min(0.05, (now - (state.lastFrame || now)) / 1000);
+  state.lastFrame = now;
+
+  if (state.handsReady && video.readyState >= 2 && !state.processingHands) {
+    state.processingHands = true;
+    try {
+      await state.handsModel.send({ image: video });
+    } catch (err) {
+      console.warn('MediaPipe:', err);
+    } finally {
+      state.processingHands = false;
     }
-  })();
-  </script>
+  }
+
+  collectCoins(now);
+
+  for (let i = effectsGroup.children.length - 1; i >= 0; i--) {
+    const obj = effectsGroup.children[i];
+    if (obj.userData.life !== undefined) {
+      obj.userData.life -= delta;
+      if (obj.material && obj.material.opacity !== undefined) {
+        obj.material.opacity = Math.max(0, obj.userData.life / 0.12);
+      }
+      if (obj.userData.life <= 0) {
+        effectsGroup.remove(obj);
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) obj.material.dispose();
+      }
+    }
+  }
+
+  if (muzzleFlash && muzzleFlash.material.opacity > 0) {
+    muzzleFlash.material.opacity = Math.max(0, muzzleFlash.material.opacity - delta * 12);
+  }
+
+  if (state.toastUntil && now > state.toastUntil) {
+    $('toast').style.display = 'none';
+    state.toastUntil = 0;
+  }
+
+  renderFrame();
+}
+
+function setMode(mode) {
+  state.mode = mode === 'AR' ? 'AR' : 'VR';
+  video.style.display = state.mode === 'AR' && state.cameraReady ? 'block' : 'none';
+
+  if (state.mode === 'AR') {
+    // Mantém a câmera traseira como fundo e o rifle/objetos como camada 3D.
+    scene.background = null;
+    scene.fog = null;
+    renderer.setClearColor(0x000000, 0);
+  } else {
+    scene.background = new THREE.Color(0x050a13);
+    scene.fog = new THREE.Fog(0x050a13, 8, 35);
+    renderer.setClearColor(0x000000, 0);
+  }
+
+  $('switchMode').textContent = state.mode === 'VR' ? 'Mudar para AR' : 'Mudar para VR';
+  updateHUD();
+}
+
+async function startGame() {
+  try {
+    initAudio();
+    if (!renderer) initThree();
+
+    state.running = true;
+    $('menu').style.display = 'none';
+    $('errorBox').style.display = 'none';
+
+    if (!state.cameraReady) {
+      await startCamera();
+    }
+
+    if (state.headPermission && !state.headReady) {
+      // O sensor será considerado ativo após chegar o primeiro evento válido.
+      setStartup('Aguardando orientação do iPhone...');
+    }
+
+    updateHUD();
+    cancelAnimationFrame(state.animFrame);
+    state.animFrame = requestAnimationFrame(frame);
+  } catch (err) {
+    state.running = false;
+    showError('Erro ao iniciar o jogo',
+      (err.message || String(err)) +
+      '\n\nConfira se as bibliotecas carregaram e tente novamente.');
+  }
+}
+
+$('start').addEventListener('click', startGame);
+$('cameraButton').addEventListener('click', async () => {
+  try {
+    if (!renderer) initThree();
+    await startCamera();
+  } catch (err) {
+    showError('Erro na câmera', err.message || String(err));
+  }
+});
+$('headButton').addEventListener('click', enableHeadTracking);
+$('vrButton').addEventListener('click', () => setMode('VR'));
+$('arButton').addEventListener('click', () => setMode('AR'));
+
+$('switchMode').addEventListener('click', () => {
+  setMode(state.mode === 'VR' ? 'AR' : 'VR');
+});
+
+$('fireButton').addEventListener('pointerdown', event => {
+  event.preventDefault();
+  shoot('button');
+});
+
+$('closeError').addEventListener('click', () => {
+  $('errorBox').style.display = 'none';
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    // Reduz carga quando o Safari fica em segundo plano.
+    if (state.animFrame) cancelAnimationFrame(state.animFrame);
+  } else if (state.running) {
+    state.lastFrame = 0;
+    state.animFrame = requestAnimationFrame(frame);
+  }
+});
+
+window.addEventListener('pagehide', () => {
+  if (state.stream) {
+    state.stream.getTracks().forEach(track => track.stop());
+  }
+  if (state.handsModel && state.handsModel.close) {
+    try { state.handsModel.close(); } catch (_) {}
+  }
+  if (renderer) renderer.dispose();
+});
+
+updateHUD();
+})();
+</script>
 </body>
 </html>
