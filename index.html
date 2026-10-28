@@ -1,393 +1,1404 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#080609">
-<title>AR HAND STRIKE: NIGHTMARE</title>
-<style>
-:root{--red:#ff2448;--dark:#080609;--panel:rgba(10,8,14,.82)}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--dark);color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;touch-action:manipulation}
-#app{position:fixed;inset:0;overflow:hidden}
-#camera,#three{position:absolute;inset:0;width:100%;height:100%}
-#camera{object-fit:cover;background:#050507}
-#three{pointer-events:none}
-#vignette{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse,transparent 35%,#0005 75%,#000e 120%);z-index:2}
-#hud{position:absolute;inset:0;z-index:5;pointer-events:none}
-.top{position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:12px;right:12px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
-.panel{background:var(--panel);border:1px solid #ffffff24;border-radius:13px;padding:9px 11px;backdrop-filter:blur(12px)}
-.brand{font-size:10px;letter-spacing:2px;color:#ff657c;font-weight:900}
-.subtitle{font-size:8px;letter-spacing:1.5px;color:#aaa;margin-top:4px}
-.label{font-size:8px;letter-spacing:1.4px;color:#aaa;text-transform:uppercase}
-.value{font-size:19px;font-weight:950;font-variant-numeric:tabular-nums}
-#wave{color:#ff647d}
-#score{text-align:right}
-#tracking{position:absolute;top:92px;left:12px;font-size:9px;letter-spacing:1px;background:#080609b8;padding:8px 10px;border:1px solid #ffffff20;border-radius:9px}
-#tracking b{color:#ff8292}
-#crosshair{position:absolute;left:50%;top:50%;width:48px;height:48px;border:1px solid #ff8c9a99;border-radius:50%;transform:translate(-50%,-50%);filter:drop-shadow(0 0 6px #ff243f);transition:transform .07s}
-#crosshair:before,#crosshair:after{content:"";position:absolute;background:#ffb6c0}
-#crosshair:before{width:1px;height:62px;left:23px;top:-8px}
-#crosshair:after{height:1px;width:62px;top:23px;left:-8px}
-#crosshair .dot{position:absolute;width:4px;height:4px;left:50%;top:50%;background:#ff243f;border-radius:50%;transform:translate(-50%,-50%)}
-#crosshair.pinching{transform:translate(-50%,-50%) scale(.78);border-color:white}
-#crosshair.hit{border-color:white}
-#boss{display:none;position:absolute;top:calc(env(safe-area-inset-top) + 75px);left:18%;right:18%;text-align:center}
-#boss.visible{display:block}
-#bossLabel{font-size:9px;letter-spacing:3px;color:#ff667d;font-weight:900;margin-bottom:5px}
-.bar{height:6px;background:#ffffff1d;border-radius:8px;overflow:hidden}
-#bossFill{height:100%;width:100%;background:#ff2448;box-shadow:0 0 12px #ff2448}
-#message{position:absolute;top:25%;left:50%;width:90%;transform:translateX(-50%);text-align:center;font-size:clamp(19px,5vw,27px);font-weight:1000;letter-spacing:3px;text-shadow:0 0 20px #f003;opacity:0;transition:opacity .2s}
-#message.show{opacity:1}
-.bottom{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 12px);left:12px;right:12px;display:flex;justify-content:space-between;align-items:flex-end;gap:8px}
-#healthPanel{width:38%;max-width:170px}
-.healthrow{display:flex;justify-content:space-between;font-size:9px;font-weight:800;letter-spacing:1px}
-#healthNum{font-size:11px}
-#healthFill{height:100%;width:100%;background:linear-gradient(90deg,#900b27,#ff344f);transition:width .2s}
-#ammoPanel{text-align:center;min-width:88px}
-#ammo{font-size:24px;font-weight:950;line-height:1}
-#ammo span{font-size:12px;color:#aaa}
-#ammoLabel{font-size:8px;letter-spacing:1.5px;color:#aaa;margin-top:4px}
-button{pointer-events:auto;cursor:pointer;touch-action:manipulation}
-.action{border:1px solid #ffffff30;border-radius:12px;padding:12px 10px;min-height:43px;background:#111019ee;color:#fff;font-size:9px;letter-spacing:1px;font-weight:900}
-#soundBtn{position:absolute;right:12px;top:92px;padding:8px 10px;font-size:9px}
-#flash,#damage{position:absolute;inset:0;z-index:7;pointer-events:none;opacity:0}
-#flash{background:#fff}
-#damage{z-index:8;background:radial-gradient(ellipse,transparent 25%,#ff002eaa 100%)}
-#flash.active{animation:flash .12s}
-#damage.active{animation:damage .35s}
-@keyframes flash{0%{opacity:.65}100%{opacity:0}}
-@keyframes damage{0%{opacity:.9}100%{opacity:0}}
-#toast{position:absolute;z-index:10;top:40%;left:50%;transform:translate(-50%,-50%);background:#100b10ed;border:1px solid #ff435a70;padding:12px 16px;border-radius:12px;font-size:11px;font-weight:900;letter-spacing:2px;opacity:0;transition:opacity .15s;white-space:nowrap;pointer-events:none}
-#toast.show{opacity:1}
-#overlay{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:22px;background:linear-gradient(#030408c9,#030408f2);backdrop-filter:blur(8px)}
-#overlay.hidden{display:none}
-.modal{width:min(430px,100%);border:1px solid #ff334b55;border-radius:22px;padding:23px 20px;background:linear-gradient(145deg,#171019f5,#080a10f7);box-shadow:0 0 50px #a0002530}
-.kicker{font-size:9px;letter-spacing:3px;color:#ff687b;font-weight:900}
-h1{font-size:clamp(28px,8vw,42px);line-height:.98;letter-spacing:-1.5px;margin:12px 0;font-weight:1000}
-h1 em{font-style:normal;color:#ff304a}
-.desc{font-size:12px;line-height:1.6;color:#c3c6d0;margin:13px 0 18px}
-.instructions{display:grid;gap:10px;margin:17px 0 20px}
-.instruction{display:flex;align-items:center;gap:10px;font-size:11px;color:#e5e6ec}
-.icon{width:31px;height:31px;display:grid;place-items:center;flex:none;border:1px solid #ff526544;background:#ff243f12;border-radius:9px;color:#ff8490;font-weight:900}
-.mainBtn{width:100%;border:0;border-radius:13px;padding:16px;background:linear-gradient(100deg,#9d1028,#ff2b48);color:white;font-weight:1000;letter-spacing:1.5px;font-size:11px;box-shadow:0 7px 24px #f13a4a35}
-#note{font-size:10px;line-height:1.5;color:#999eaa;margin-top:12px;text-align:center}
-@media(max-height:650px){.modal{padding:16px}.instructions{gap:6px;margin:10px 0 13px}.bottom{bottom:calc(env(safe-area-inset-bottom) + 7px)}}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>AR HAND STRIKE: NIGHTMARE</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Three.js WebXR VRButton -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/webxr/VRButton.js"></script>
+
+    <!-- MediaPipe Vision Tasks -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.js" crossorigin="anonymous"></script>
+
+    <style>
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            -webkit-touch-callout: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #fff;
+        }
+
+        /* Safe area support for iOS Notch / Dynamic Island */
+        .safe-area-top { padding-top: max(1rem, env(safe-area-inset-top)); }
+        .safe-area-bottom { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+        .safe-area-left { padding-left: max(1rem, env(safe-area-inset-left)); }
+        .safe-area-right { padding-right: max(1rem, env(safe-area-inset-right)); }
+
+        #camera-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+            transform: scaleX(1); /* Rear camera doesn't need mirroring */
+        }
+
+        #three-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        /* Horror Vignette and FX Overlays */
+        .vignette {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 3;
+            background: radial-gradient(circle, transparent 50%, rgba(0, 0, 0, 0.85) 90%, rgba(15, 0, 0, 0.98) 100%);
+        }
+
+        .damage-flash {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 4;
+            background: radial-gradient(circle, rgba(220, 38, 38, 0.2) 0%, rgba(185, 28, 28, 0.8) 100%);
+            opacity: 0;
+            transition: opacity 0.15s ease-out;
+        }
+
+        /* Reticle UI */
+        #reticle {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 10;
+            display: none;
+            transition: transform 0.05s linear;
+        }
+
+        .reticle-ring {
+            width: 100%;
+            height: 100%;
+            border: 2px dashed #ef4444;
+            border-radius: 50%;
+            animation: spin 8s linear infinite;
+        }
+
+        .reticle-dot {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 8px;
+            height: 8px;
+            background-color: #ef4444;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px #ef4444, 0 0 20px #ef4444;
+        }
+
+        .reticle-pinch {
+            border-color: #22c55e !important;
+            transform: scale(0.8);
+        }
+
+        .reticle-pinch .reticle-dot {
+            background-color: #22c55e !important;
+            box-shadow: 0 0 12px #22c55e, 0 0 25px #22c55e !important;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Scanline Horror FX */
+        .scanlines {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            background-size: 100% 4px;
+            z-index: 3;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        .glow-red {
+            text-shadow: 0 0 10px rgba(239, 68, 68, 0.8), 0 0 20px rgba(185, 28, 28, 0.6);
+        }
+
+        /* Glassmorphism Panels */
+        .glass-panel {
+            background: rgba(12, 10, 15, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+        }
+    </style>
 </head>
 <body>
-<div id="app">
-<video id="camera" autoplay muted playsinline></video>
-<canvas id="three"></canvas>
-<div id="vignette"></div>
-<div id="flash"></div><div id="damage"></div><div id="toast"></div>
-<div id="hud">
-  <div class="top">
-    <div class="panel"><div class="brand">AR HAND STRIKE</div><div class="subtitle">NIGHTMARE PROTOCOL</div></div>
-    <div class="panel"><div class="label">ONDA</div><div class="value" id="wave">01</div></div>
-    <div class="panel" id="score"><div class="label">ABATES</div><div class="value" id="scoreValue">0000</div></div>
-  </div>
-  <div id="tracking">RASTREAMENTO: <b id="trackingText">AGUARDANDO</b></div>
-  <button class="action" id="soundBtn">ÁUDIO: OFF</button>
-  <div id="boss"><div id="bossLabel">ENTIDADE ALFA</div><div class="bar"><div id="bossFill"></div></div></div>
-  <div id="message"></div>
-  <div id="crosshair"><div class="dot"></div></div>
-  <div class="bottom">
-    <div class="panel" id="healthPanel"><div class="healthrow"><span>INTEGRIDADE</span><span id="healthNum">100%</span></div><div class="bar" style="margin-top:7px"><div id="healthFill"></div></div></div>
-    <div class="panel" id="ammoPanel"><div id="ammo">12<span> / 12</span></div><div id="ammoLabel">CARGAS</div></div>
-    <button class="action" id="reloadBtn">RECARREGAR ↻</button>
-  </div>
-</div>
-<div id="overlay">
-  <div class="modal">
-    <div class="kicker" id="kicker">SINAL PERDIDO // SETOR 09</div>
-    <h1 id="title">AR HAND STRIKE<br><em>NIGHTMARE</em></h1>
-    <p class="desc" id="description">Algo atravessou a escuridão. Levante a mão diante da câmera e sobreviva às ondas. Não deixe as criaturas chegarem perto demais.</p>
-    <div class="instructions">
-      <div class="instruction"><div class="icon">◎</div><div><b>MIRA</b> — mova a ponta do indicador.</div></div>
-      <div class="instruction"><div class="icon">⌁</div><div><b>DISPARO</b> — junte polegar e indicador.</div></div>
-      <div class="instruction"><div class="icon">↻</div><div><b>RECARGA</b> — toque no botão inferior direito.</div></div>
+
+    <!-- Camera Background -->
+    <video id="camera-video" autoplay playsinline muted></video>
+
+    <!-- 3D Three.js Overlay -->
+    <canvas id="three-canvas"></canvas>
+
+    <!-- Atmosphere Filters -->
+    <div class="vignette"></div>
+    <div class="scanlines"></div>
+    <div id="damage-flash" class="damage-flash"></div>
+
+    <!-- Dynamic Tracking Reticle -->
+    <div id="reticle">
+        <div class="reticle-ring" id="reticle-ring"></div>
+        <div class="reticle-dot"></div>
     </div>
-    <button class="mainBtn" id="startBtn">INICIAR SOBREVIVÊNCIA</button>
-    <div id="note">Requer HTTPS, acesso à câmera e conexão para carregar o modelo MediaPipe. Mantenha sua mão visível no enquadramento.</div>
-  </div>
-</div>
-</div>
-<script type="module">
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
-import {FilesetResolver,HandLandmarker} from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
 
-const $=id=>document.getElementById(id);
-const video=$('camera'),canvas=$('three'),overlay=$('overlay');
-let renderer,scene,camera3D,landmarker,stream,audioCtx,audioOn=false;
-let started=false,gameOver=false,tracking=false,reloading=false,lastVideoTime=-1,lastPinch=false,lastShot=0,lastDamage=0;
-let health=100,ammo=12,maxAmmo=12,score=0,wave=1,aimX=.5,aimY=.5,enemyId=0,frame=0;
-let enemies=[],effects=[],centerTimer,toastTimer;
-const clock=new THREE.Clock(),raycaster=new THREE.Raycaster();
-const enemyGroup=new THREE.Group();
-const M=(c,r=.8,m=0,e=0,i=0)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m,emissive:e,emissiveIntensity:i});
-const materials={
- flesh:M(0x252027),dark:M(0x09090e),bone:M(0x918588),red:M(0x9b1028,.4,.1,0x600014,1.6),
- eyes:new THREE.MeshBasicMaterial({color:0xff153b}),claw:M(0x171319,.5,.1),pale:M(0xb0a1a3,.8,0,0x260008,.4)
-};
+    <!-- HUD Overlay -->
+    <div id="hud" class="absolute inset-0 z-20 pointer-events-none hidden flex flex-col justify-between p-4 safe-area-top safe-area-bottom safe-area-left safe-area-right">
+        
+        <!-- Top Status Bar -->
+        <div class="flex justify-between items-start">
+            <div class="flex flex-col gap-1">
+                <div class="glass-panel px-3 py-1.5 rounded-lg flex items-center gap-2">
+                    <i class="fa-solid fa-crosshairs text-red-500 text-xs animate-pulse"></i>
+                    <span id="wave-display" class="font-bold tracking-widest text-sm text-red-500">WAVE 1</span>
+                </div>
+                <div class="glass-panel px-3 py-1.5 rounded-lg flex items-center gap-2">
+                    <i class="fa-solid fa-trophy text-yellow-500 text-xs"></i>
+                    <span id="score-display" class="font-mono text-xs text-gray-300">SCORE: 0</span>
+                </div>
+            </div>
 
-function init3D(){
- scene=new THREE.Scene();
- camera3D=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,100);
- camera3D.position.set(0,0,0);
- renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:false,powerPreference:'low-power'});
- renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));
- renderer.setSize(innerWidth,innerHeight,false);
- renderer.outputColorSpace=THREE.SRGBColorSpace;
- renderer.toneMapping=THREE.ACESFilmicToneMapping;
- renderer.toneMappingExposure=1.25;
- scene.add(new THREE.HemisphereLight(0x8290b0,0x12050a,1.4));
- const redLight=new THREE.PointLight(0xff123b,7,18);redLight.position.set(0,1,-4);scene.add(redLight);
- const coldLight=new THREE.PointLight(0x526d9a,4,16);coldLight.position.set(-4,2,-6);scene.add(coldLight);
- scene.add(enemyGroup);
- addEventListener('resize',resize);
- animate();
-}
-function resize(){
- if(!renderer)return;
- renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));
- renderer.setSize(innerWidth,innerHeight,false);
- camera3D.aspect=innerWidth/innerHeight;camera3D.updateProjectionMatrix();
-}
-function creature(boss=false){
- const g=new THREE.Group(),scale=boss?1.55:1;
- g.scale.setScalar(scale);
- const torso=new THREE.Mesh(new THREE.IcosahedronGeometry(.42,1),boss?materials.pale:materials.flesh);
- torso.scale.set(.85,1.2,.55);torso.position.y=.05;g.add(torso);
- const head=new THREE.Group();head.position.set(0,.68,0);g.add(head);
- const skull=new THREE.Mesh(new THREE.SphereGeometry(.31,12,10),boss?materials.bone:materials.pale);
- skull.scale.set(.8,1.15,.78);head.add(skull);
- const jaw=new THREE.Mesh(new THREE.BoxGeometry(.34,.17,.27),materials.dark);jaw.position.set(0,-.22,.11);head.add(jaw);
- for(const side of [-1,1]){
-  const socket=new THREE.Mesh(new THREE.SphereGeometry(.09,8,8),materials.dark);socket.position.set(side*.12,.04,.23);head.add(socket);
-  const eye=new THREE.Mesh(new THREE.SphereGeometry(boss?.075:.052,8,8),materials.eyes);eye.position.set(side*.12,.04,.3);head.add(eye);
-  const glow=new THREE.PointLight(0xff1038,boss?1.5:.6,2);glow.position.copy(eye.position);head.add(glow);
-  const arm=new THREE.Group();arm.position.set(side*.35,.25,0);g.add(arm);
-  const upper=new THREE.Mesh(new THREE.CylinderGeometry(.075,.11,.48,7),materials.flesh);upper.position.set(side*.04,-.22,0);arm.add(upper);
-  const fore=new THREE.Mesh(new THREE.CylinderGeometry(.04,.075,.42,7),materials.dark);fore.position.set(side*.1,-.61,.03);arm.add(fore);
-  const claw=new THREE.Mesh(new THREE.ConeGeometry(.055,.24,6),materials.claw);claw.position.set(side*.12,-.91,.08);claw.rotation.x=Math.PI;arm.add(claw);
-  g.userData[side<0?'leftArm':'rightArm']=arm;
- }
- const ribs=new THREE.Mesh(new THREE.TorusGeometry(.25,.035,5,10),materials.red);ribs.position.set(0,.05,.22);ribs.rotation.x=Math.PI/2;g.add(ribs);
- for(let i=0;i<3;i++){const spike=new THREE.Mesh(new THREE.ConeGeometry(.07,.28,5),materials.claw);spike.position.set((i-1)*.19,.45,-.05);g.add(spike);}
- g.userData.head=head;g.userData.phase=Math.random()*6.28;
- g.userData.hp=boss?9:(wave>=4?3:2);g.userData.boss=boss;
- g.userData.speed=(boss?.16:.23)+Math.min(wave*.018,.16);
- g.userData.baseY=(Math.random()-.5)*2.7;
- g.position.set((Math.random()-.5)*4.7,g.userData.baseY,-(boss?8.5:7.5+Math.random()*3));
- g.userData.id=++enemyId;enemyGroup.add(g);enemies.push(g);
- if(boss){$('boss').classList.add('visible');$('bossFill').style.width='100%';$('bossLabel').textContent='ENTIDADE ALFA // CHEFE';toast('A ENTIDADE ALFA DESPERTOU');}
-}
-function spawnWave(){
- if(gameOver)return;
- const boss=wave%5===0;
- message(boss?'ALGO ANTIGO DESPERTOU':`ONDA ${String(wave).padStart(2,'0')}`);
- creature(boss);
- const amount=boss?0:Math.min(2+Math.floor(wave/2),5);
- for(let i=0;i<amount;i++)setTimeout(()=>{if(started&&!gameOver)creature(false)},850+i*950);
-}
-function message(s){$('message').textContent=s;$('message').classList.add('show');clearTimeout(centerTimer);centerTimer=setTimeout(()=>$('message').classList.remove('show'),1500)}
-function toast(s){$('toast').textContent=s;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),900)}
-function hud(){
- $('healthNum').textContent=Math.max(0,Math.round(health))+'%';
- $('healthFill').style.width=Math.max(0,health)+'%';
- $('ammo').innerHTML=`${ammo}<span> / ${maxAmmo}</span>`;
- $('scoreValue').textContent=String(score).padStart(4,'0');
- $('wave').textContent=String(wave).padStart(2,'0');
-}
-function initAudio(){
- try{audioCtx=new(window.AudioContext||window.webkitAudioContext)();audioOn=true;$('soundBtn').textContent='ÁUDIO: ON';audioCtx.resume()}catch(e){audioOn=false}
-}
-function tone(freq,duration,type='sawtooth',volume=.04,slide=0){
- if(!audioOn||!audioCtx)return;
- try{
-  const o=audioCtx.createOscillator(),g=audioCtx.createGain(),now=audioCtx.currentTime;
-  o.type=type;o.frequency.setValueAtTime(freq,now);
-  if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(20,freq+slide),now+duration);
-  g.gain.setValueAtTime(volume,now);g.gain.exponentialRampToValueAtTime(.001,now+duration);
-  o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(now+duration+.02);
- }catch(e){}
-}
-function noise(duration=.09,volume=.05){
- if(!audioOn||!audioCtx)return;
- try{
-  const n=Math.floor(audioCtx.sampleRate*duration),b=audioCtx.createBuffer(1,n,audioCtx.sampleRate),d=b.getChannelData(0);
-  for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);
-  const s=audioCtx.createBufferSource(),g=audioCtx.createGain();s.buffer=b;g.gain.value=volume;s.connect(g);g.connect(audioCtx.destination);s.start();
- }catch(e){}
-}
-function effectAt(point,color=0xff304b,count=7){
- for(let i=0;i<count;i++){
-  const mesh=new THREE.Mesh(new THREE.SphereGeometry(.025+Math.random()*.025,5,5),new THREE.MeshBasicMaterial({color,transparent:true}));
-  mesh.position.copy(point);scene.add(mesh);
-  effects.push({mesh,life:.3+Math.random()*.3,max:.6,vel:new THREE.Vector3((Math.random()-.5)*2,(Math.random()-.5)*2,(Math.random()-.5)*2)});
- }
-}
-function muzzle(){
- const p=new THREE.Mesh(new THREE.SphereGeometry(.1,7,7),new THREE.MeshBasicMaterial({color:0xffa0aa,transparent:true,opacity:.9}));
- p.position.set((aimX-.5)*.2,(.5-aimY)*.2,-.5);scene.add(p);
- effects.push({mesh:p,life:.12,max:.12,vel:new THREE.Vector3()});
- for(let i=0;i<4;i++){
-  const m=new THREE.Mesh(new THREE.SphereGeometry(.025,5,5),new THREE.MeshBasicMaterial({color:0xff334c}));
-  m.position.copy(p.position);scene.add(m);effects.push({mesh:m,life:.2,max:.2,vel:new THREE.Vector3((Math.random()-.5)*2,(Math.random()-.5)*2,-Math.random()*2)});
- }
-}
-function shoot(){
- if(!started||gameOver||reloading)return;
- const now=performance.now();if(now-lastShot<280)return;lastShot=now;
- if(ammo<=0){tone(90,.08,'square',.025);toast('SEM CARGAS — RECARREGUE');return}
- ammo--;hud();tone(155,.1,'sawtooth',.07,-100);noise(.07,.045);muzzle();
- $('flash').classList.remove('active');void $('flash').offsetWidth;$('flash').classList.add('active');
- $('crosshair').classList.add('pinching');setTimeout(()=>$('crosshair').classList.remove('pinching'),100);
- raycaster.setFromCamera(new THREE.Vector2(aimX*2-1,1-aimY*2),camera3D);
- const targets=[];for(const e of enemies)e.traverse(o=>{if(o.isMesh)targets.push(o)});
- const hits=raycaster.intersectObjects(targets,false);
- if(hits.length){
-  let target=hits[0].object;while(target.parent&&target.parent!==enemyGroup)target=target.parent;
-  if(target.parent===enemyGroup){
-   target.userData.hp--;score+=100;effectAt(hits[0].point);
-   toast(target.userData.hp<=0?'CRIATURA ELIMINADA +100':'ACERTO +100');
-   tone(target.userData.hp<=0?65:240,.16,'triangle',.07,-70);
-   if(target.userData.boss)$('bossFill').style.width=Math.max(0,target.userData.hp/9*100)+'%';
-   if(target.userData.hp<=0)kill(target);
-   hud();
-  }
- }
-}
-function kill(e){
- const idx=enemies.indexOf(e);if(idx>=0)enemies.splice(idx,1);
- for(let i=0;i<13;i++){
-  const mesh=new THREE.Mesh(new THREE.IcosahedronGeometry(.04+Math.random()*.05,0),new THREE.MeshBasicMaterial({color:[0x5c071b,0xff233f,0x181018][i%3],transparent:true}));
-  mesh.position.copy(e.position).add(new THREE.Vector3((Math.random()-.5)*.7,(Math.random()-.5)*.8,0));scene.add(mesh);
-  effects.push({mesh,life:.7+Math.random()*.4,max:1.1,vel:new THREE.Vector3((Math.random()-.5)*2,Math.random()*2,(Math.random()-.5)*1.5)});
- }
- enemyGroup.remove(e);dispose(e);
- if(e.userData.boss){$('boss').classList.remove('visible');health=Math.min(100,health+20);message('A ENTIDADE FOI SILENCIADA')}
- if(enemies.length===0){wave++;health=Math.min(100,health+8);ammo=maxAmmo;hud();setTimeout(()=>{if(started&&!gameOver)spawnWave()},1600)}
-}
-function dispose(o){o.traverse(x=>{if(x.geometry)x.geometry.dispose()})}
-function reload(){
- if(!started||gameOver||reloading||ammo===maxAmmo)return;
- reloading=true;toast('RECARREGANDO...');tone(280,.07,'square',.025,-90);
- setTimeout(()=>{if(!gameOver){ammo=maxAmmo;hud();tone(430,.1,'triangle',.04,100);toast('ARMA PRONTA')}reloading=false},1050);
-}
-function damagePlayer(){
- const now=performance.now();if(now-lastDamage<850)return;lastDamage=now;
- health-=12;hud();
- $('damage').classList.remove('active');void $('damage').offsetWidth;$('damage').classList.add('active');
- tone(55,.24,'sawtooth',.08,-25);
- if(navigator.vibrate)navigator.vibrate(90);
- if(health<=0)endGame();
-}
-function endGame(){
- gameOver=true;started=false;$('boss').classList.remove('visible');
- overlay.classList.remove('hidden');
- $('kicker').textContent='SINAL ENCERRADO // VOCÊ CAIU';
- $('title').innerHTML='FIM DE<br><em>JOGO</em>';
- $('description').textContent=`Você chegou à onda ${wave} e eliminou ${score/100} criaturas. A escuridão venceu desta vez.`;
- $('startBtn').textContent='TENTAR NOVAMENTE';
- $('note').textContent='Toque para reiniciar a sobrevivência.';
-}
-function updateEnemies(dt){
- for(const e of [...enemies]){
-  e.userData.phase+=dt*2;
-  e.position.y=e.userData.baseY+Math.sin(e.userData.phase)*.13;
-  e.rotation.y=Math.sin(e.userData.phase*.7)*.13;
-  e.userData.head.rotation.x=Math.sin(e.userData.phase*1.3)*.08;
-  if(e.userData.leftArm)e.userData.leftArm.rotation.x=Math.sin(e.userData.phase*1.5)*.16;
-  if(e.userData.rightArm)e.userData.rightArm.rotation.x=-Math.sin(e.userData.phase*1.5)*.16;
-  e.position.z+=e.userData.speed*dt;
-  if(e.position.z>-1.2){
-   damagePlayer();enemyGroup.remove(e);enemies.splice(enemies.indexOf(e),1);dispose(e);
-   if(enemies.length===0&&!gameOver){wave++;hud();setTimeout(()=>{if(started&&!gameOver)spawnWave()},1300)}
-  }
- }
-}
-function updateEffects(dt){
- for(let i=effects.length-1;i>=0;i--){
-  const e=effects[i];e.life-=dt;
-  e.mesh.position.addScaledVector(e.vel,dt);e.vel.y-=dt*1.4;
-  if(e.mesh.material&&'opacity'in e.mesh.material)e.mesh.material.opacity=Math.max(0,e.life/e.max);
-  if(e.life<=0){scene.remove(e.mesh);e.mesh.geometry?.dispose();e.mesh.material?.dispose();effects.splice(i,1)}
- }
-}
-function animate(){
- requestAnimationFrame(animate);if(!renderer)return;
- const dt=Math.min(clock.getDelta(),.04);
- if(started&&!gameOver)updateEnemies(dt);
- updateEffects(dt);
- if(frame++%2===0)renderer.render(scene,camera3D);
-}
-async function setupTracking(){
- const vision=await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
- landmarker=await HandLandmarker.createFromOptions(vision,{
-  baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',delegate:'GPU'},
-  runningMode:'VIDEO',numHands:1,minHandDetectionConfidence:.55,minHandPresenceConfidence:.5,minTrackingConfidence:.5
- });
- trackingLoop();
-}
-function trackingLoop(){
- if(video.readyState>=2&&landmarker&&video.currentTime!==lastVideoTime){
-  lastVideoTime=video.currentTime;
-  try{
-   const result=landmarker.detectForVideo(video,performance.now());
-   if(result.landmarks?.length){
-    tracking=true;
-    const lm=result.landmarks[0],tip=lm[8],thumb=lm[4];
-    aimX=THREE.MathUtils.clamp(1-tip.x,.04,.96);
-    aimY=THREE.MathUtils.clamp(tip.y,.06,.94);
-    $('trackingText').textContent='MÃO DETECTADA';$('trackingText').style.color='#8cffc5';
-    const pinch=Math.hypot(tip.x-thumb.x,tip.y-thumb.y)<.048;
-    if(pinch&&!lastPinch&&started)shoot();
-    lastPinch=pinch;
-    $('crosshair').style.left=aimX*100+'%';$('crosshair').style.top=aimY*100+'%';
-    $('crosshair').classList.toggle('pinching',pinch);
-   }else{
-    tracking=false;lastPinch=false;
-    $('trackingText').textContent='MOSTRE SUA MÃO';$('trackingText').style.color='#ff8b98';
-   }
-  }catch(e){$('trackingText').textContent='RASTREAMENTO...'}
- }
- requestAnimationFrame(trackingLoop);
-}
-async function startGame(){
- $('startBtn').disabled=true;$('startBtn').textContent='INICIALIZANDO...';
- try{
-  if(!renderer)init3D();
-  if(!stream){
-   stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30,max:30}}});
-   video.srcObject=stream;await video.play();
-  }
-  if(!landmarker)await setupTracking();
-  if(!audioCtx)initAudio();else if(audioCtx.state==='suspended')await audioCtx.resume();
-  for(const e of enemies){enemyGroup.remove(e);dispose(e)}enemies=[];
-  for(const e of effects){scene.remove(e.mesh)}effects=[];
-  health=100;ammo=maxAmmo;score=0;wave=1;gameOver=false;started=true;reloading=false;
-  $('boss').classList.remove('visible');overlay.classList.add('hidden');
-  $('kicker').textContent='SINAL PERDIDO // SETOR 09';
-  $('title').innerHTML='AR HAND STRIKE<br><em>NIGHTMARE</em>';
-  hud();spawnWave();tone(80,.5,'sawtooth',.04,180);
- }catch(err){
-  console.error(err);$('startBtn').disabled=false;$('startBtn').textContent='TENTAR NOVAMENTE';
-  $('note').textContent='Falha ao iniciar. Abra a página por HTTPS no Safari, permita a câmera e confira a conexão. '+(err?.message||err);
- }finally{
-  $('startBtn').disabled=false;
-  if(!gameOver)$('startBtn').textContent='INICIAR SOBREVIVÊNCIA';
- }
-}
-$('startBtn').addEventListener('click',startGame);
-$('reloadBtn').addEventListener('click',reload);
-$('soundBtn').addEventListener('click',()=>{
- if(!audioCtx)initAudio();
- else{audioOn=!audioOn;$('soundBtn').textContent=audioOn?'ÁUDIO: ON':'ÁUDIO: OFF';if(audioOn&&audioCtx.state==='suspended')audioCtx.resume()}
-});
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&audioCtx?.state==='running')audioCtx.suspend()});
-if(!navigator.mediaDevices?.getUserMedia)$('note').textContent='Este navegador não oferece acesso à câmera. Abra o jogo por HTTPS no Safari atualizado.';
-</script>
+            <!-- Hand Tracking Status -->
+            <div class="glass-panel px-3 py-1.5 rounded-lg flex items-center gap-2">
+                <div id="tracking-dot" class="w-2.5 h-2.5 rounded-full bg-red-600"></div>
+                <span id="tracking-text" class="text-xs font-mono uppercase tracking-wider text-gray-300">NO HAND</span>
+            </div>
+
+            <button id="pause-btn" class="pointer-events-auto glass-panel w-10 h-10 rounded-lg flex items-center justify-center text-white hover:border-red-500 active:scale-95 transition">
+                <i class="fa-solid fa-pause"></i>
+            </button>
+        </div>
+
+        <!-- Boss Health Bar (Hidden by default) -->
+        <div id="boss-hud" class="w-full max-w-md mx-auto hidden flex-col items-center gap-1 my-2">
+            <div class="w-full flex justify-between text-xs font-bold text-red-500 tracking-widest uppercase">
+                <span id="boss-name">ALPHA ENTITY</span>
+                <span id="boss-hp-text">100%</span>
+            </div>
+            <div class="w-full h-3 bg-gray-950 rounded-full overflow-hidden border border-red-900/60 p-0.5">
+                <div id="boss-hp-bar" class="h-full bg-gradient-to-r from-red-800 to-red-500 rounded-full transition-all duration-200" style="width: 100%;"></div>
+            </div>
+        </div>
+
+        <!-- Bottom Controls & Ammo Display -->
+        <div class="flex justify-between items-end">
+            <!-- Health Bar -->
+            <div class="glass-panel p-3 rounded-xl flex flex-col gap-1 w-36 sm:w-48">
+                <div class="flex justify-between items-center text-xs text-gray-300 font-bold">
+                    <span><i class="fa-solid fa-heart text-red-500 mr-1"></i> LIFE</span>
+                    <span id="health-num">100</span>
+                </div>
+                <div class="w-full h-2.5 bg-black/60 rounded-full overflow-hidden border border-red-900/30">
+                    <div id="health-bar" class="h-full bg-red-600 transition-all duration-300 rounded-full" style="width: 100%;"></div>
+                </div>
+            </div>
+
+            <!-- WebXR VR Mode & Ammo Display -->
+            <div class="flex flex-col items-end gap-2">
+                <div id="vr-btn-container" class="pointer-events-auto"></div>
+                <div class="glass-panel px-4 py-2 rounded-xl flex items-center gap-3">
+                    <i class="fa-solid fa-gun text-red-500 text-lg"></i>
+                    <div class="flex flex-col items-end">
+                        <span id="ammo-count" class="font-mono text-xl font-black text-white tracking-widest">12 / 12</span>
+                        <span class="text-[10px] text-gray-400 uppercase tracking-wider">MAGAZINE</span>
+                    </div>
+                </div>
+                <button id="reload-btn" class="pointer-events-auto glass-panel px-4 py-2 rounded-xl text-xs font-bold tracking-wider text-red-400 hover:text-white border-red-500/40 active:scale-95 transition flex items-center gap-2">
+                    <i class="fa-solid fa-rotate-right"></i> RELOAD (PINCH / TAP)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Announcement Overlay -->
+    <div id="announcement" class="absolute inset-0 z-30 pointer-events-none flex items-center justify-center text-center opacity-0 transition-opacity duration-500">
+        <div class="px-6 py-4 glass-panel rounded-2xl border-red-600/50 max-w-sm mx-4">
+            <h2 id="announce-title" class="text-2xl font-black text-red-500 tracking-widest uppercase glow-red mb-1">WAVE 1</h2>
+            <p id="announce-subtitle" class="text-xs text-gray-300 tracking-wide font-mono">THE NIGHTMARE BEGINS</p>
+        </div>
+    </div>
+
+    <!-- Main Menu Modal -->
+    <div id="menu-modal" class="absolute inset-0 z-40 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md safe-area-top safe-area-bottom">
+        <div class="glass-panel w-full max-w-md rounded-2xl p-6 flex flex-col gap-6 text-center border-red-600/40">
+            <div>
+                <h1 class="text-3xl font-black tracking-widest text-red-600 glow-red uppercase mb-1">AR HAND STRIKE</h1>
+                <p class="text-xs tracking-widest text-gray-400 font-mono uppercase">NIGHTMARE EDITION</p>
+            </div>
+
+            <div class="text-left text-xs text-gray-300 space-y-2.5 bg-black/40 p-4 rounded-xl border border-red-950">
+                <p class="font-bold text-red-400 uppercase tracking-wider border-b border-red-900/50 pb-1">Gestures & Combat:</p>
+                <div class="flex items-center gap-2.5">
+                    <i class="fa-solid fa-hand-pointer text-red-500 w-4 text-center"></i>
+                    <span><strong>Index Tip (Landmark 8):</strong> Aim weapon reticle.</span>
+                </div>
+                <div class="flex items-center gap-2.5">
+                    <i class="fa-solid fa-hand-back-fist text-red-500 w-4 text-center"></i>
+                    <span><strong>Pinch (Index + Thumb):</strong> Shoot active target.</span>
+                </div>
+                <div class="flex items-center gap-2.5">
+                    <i class="fa-solid fa-rotate-right text-red-500 w-4 text-center"></i>
+                    <span><strong>Manual Reload:</strong> Tap RELOAD or empty clip.</span>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-3">
+                <button id="start-btn" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-red-800 to-red-600 text-white font-bold tracking-widest hover:from-red-700 hover:to-red-500 active:scale-95 transition shadow-lg shadow-red-900/40">
+                    <i class="fa-solid fa-crosshairs mr-2"></i> ENTER NIGHTMARE
+                </button>
+                <button id="settings-toggle-btn" class="w-full py-2.5 rounded-xl glass-panel text-gray-300 text-xs font-bold tracking-wider hover:text-white active:scale-95 transition">
+                    <i class="fa-solid fa-sliders mr-2"></i> SETTINGS
+                </button>
+            </div>
+
+            <div class="text-[10px] text-gray-500 font-mono flex justify-between">
+                <span>HIGH SCORE: <strong id="menu-highscore" class="text-gray-300">0</strong></span>
+                <span>MAX WAVE: <strong id="menu-maxwave" class="text-gray-300">1</strong></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pause Modal -->
+    <div id="pause-modal" class="absolute inset-0 z-40 hidden flex-col items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+        <div class="glass-panel w-full max-w-sm rounded-2xl p-6 flex flex-col gap-5 text-center border-red-600/40">
+            <h2 class="text-xl font-black text-red-500 tracking-widest uppercase glow-red">SURVIVAL PAUSED</h2>
+            <div class="flex flex-col gap-3">
+                <button id="resume-btn" class="w-full py-3 rounded-xl bg-red-700 hover:bg-red-600 text-white font-bold tracking-wider active:scale-95 transition">
+                    RESUME
+                </button>
+                <button id="restart-pause-btn" class="w-full py-2.5 rounded-xl glass-panel text-gray-300 text-xs font-bold tracking-wider hover:text-white active:scale-95 transition">
+                    RESTART
+                </button>
+                <button id="quit-btn" class="w-full py-2.5 rounded-xl glass-panel text-red-400 text-xs font-bold tracking-wider hover:text-white active:scale-95 transition">
+                    MAIN MENU
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="gameover-modal" class="absolute inset-0 z-40 hidden flex-col items-center justify-center p-4 bg-red-950/90 backdrop-blur-lg">
+        <div class="glass-panel w-full max-w-sm rounded-2xl p-6 flex flex-col gap-5 text-center border-red-500/50 shadow-2xl shadow-red-950">
+            <div>
+                <h2 class="text-3xl font-black text-red-600 tracking-widest uppercase glow-red mb-1">YOU DIED</h2>
+                <p class="text-xs text-gray-400 font-mono">CONSUMED BY THE DARKNESS</p>
+            </div>
+
+            <div class="bg-black/60 p-4 rounded-xl border border-red-900/40 flex flex-col gap-2 font-mono text-xs">
+                <div class="flex justify-between text-gray-400">
+                    <span>FINAL SCORE:</span>
+                    <span id="final-score" class="text-white font-bold">0</span>
+                </div>
+                <div class="flex justify-between text-gray-400">
+                    <span>WAVES SURVIVED:</span>
+                    <span id="final-wave" class="text-white font-bold">0</span>
+                </div>
+                <div class="flex justify-between text-gray-400">
+                    <span>ACCURACY:</span>
+                    <span id="final-accuracy" class="text-white font-bold">0%</span>
+                </div>
+            </div>
+
+            <button id="restart-btn" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-red-800 to-red-600 text-white font-bold tracking-widest hover:from-red-700 hover:to-red-500 active:scale-95 transition shadow-lg shadow-red-900/50">
+                TRY AGAIN
+            </button>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="absolute inset-0 z-50 hidden flex-col items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+        <div class="glass-panel w-full max-w-sm rounded-2xl p-6 flex flex-col gap-5 border-red-600/40">
+            <div class="flex justify-between items-center border-b border-red-900/40 pb-3">
+                <h2 class="text-lg font-bold text-red-500 tracking-wider">SYSTEM SETTINGS</h2>
+                <button id="close-settings-btn" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="space-y-4 text-xs font-mono">
+                <!-- Audio Mute -->
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-300">SOUND EFFECTS & MUSIC</span>
+                    <button id="audio-toggle-btn" class="px-3 py-1 rounded-md glass-panel text-green-400 border-green-500/40 font-bold">ENABLED</button>
+                </div>
+                <!-- Sensitivity -->
+                <div class="flex flex-col gap-1.5">
+                    <div class="flex justify-between text-gray-300">
+                        <span>AIM SENSITIVITY</span>
+                        <span id="sens-val" class="text-red-400">1.0x</span>
+                    </div>
+                    <input type="range" id="sens-slider" min="0.5" max="2.0" step="0.1" value="1.0" class="w-full accent-red-600 bg-gray-900 rounded-lg cursor-pointer">
+                </div>
+                <!-- Graphics Quality -->
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-300">GRAPHICS QUALITY</span>
+                    <select id="graphics-select" class="bg-gray-900 text-red-400 border border-red-900/60 rounded px-2 py-1 focus:outline-none">
+                        <option value="high">HIGH (1.0x Resolution)</option>
+                        <option value="medium" selected>MEDIUM (0.75x Mobile)</option>
+                        <option value="low">LOW (0.5x Performance)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button id="save-settings-btn" class="w-full py-2.5 rounded-xl bg-red-700 hover:bg-red-600 text-white font-bold text-xs tracking-wider">
+                SAVE & BACK
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN GAME SCRIPT -->
+    <script>
+        /**
+         * AR HAND STRIKE: NIGHTMARE - Game Core Logic
+         * Single-file integrated iOS AR horror game.
+         */
+
+        // Global State & Settings
+        const gameState = {
+            isRunning: false,
+            isPaused: false,
+            isVR: false,
+            score: 0,
+            wave: 1,
+            health: 100,
+            maxHealth: 100,
+            ammo: 12,
+            maxAmmo: 12,
+            isReloading: false,
+            shotsFired: 0,
+            shotsHit: 0,
+            audioEnabled: true,
+            sensitivity: 1.0,
+            graphicsQuality: 'medium',
+            highScore: parseInt(localStorage.getItem('ar_nightmare_highscore') || '0'),
+            maxWave: parseInt(localStorage.getItem('ar_nightmare_maxwave') || '1'),
+            handDetected: false,
+            lastPinchTime: 0,
+            isPinching: false,
+            activeBoss: null
+        };
+
+        // Three.js Scene & WebXR Setup
+        let scene, camera, renderer, raycaster;
+        let xrHandController, laserPointer;
+        const monsters = [];
+        const particles = [];
+        let lightFlash;
+
+        function initThreeJS() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x0a0204, 0.08);
+
+            camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({
+                canvas: DOM.canvas,
+                alpha: true,
+                antialias: true,
+                powerPreference: "high-performance"
+            });
+            
+            // Enable WebXR Mode in Three.js Engine
+            renderer.xr.enabled = true;
+            document.getElementById('vr-btn-container').appendChild(VRButton.createButton(renderer));
+
+            // WebXR Session State Callbacks
+            renderer.xr.addEventListener('sessionstart', () => {
+                gameState.isVR = true;
+                setupVRHandPointers();
+            });
+            renderer.xr.addEventListener('sessionend', () => {
+                gameState.isVR = false;
+            });
+
+            updateRendererSize();
+
+            const ambientLight = new THREE.AmbientLight(0x221111, 1.2);
+            scene.add(ambientLight);
+
+            const redDirLight = new THREE.DirectionalLight(0xff1100, 1.5);
+            redDirLight.position.set(0, 5, 2);
+            scene.add(redDirLight);
+
+            lightFlash = new THREE.PointLight(0xffffff, 0, 15);
+            lightFlash.position.set(0, 0, 0);
+            scene.add(lightFlash);
+
+            raycaster = new THREE.Raycaster();
+
+            createFloatingDust();
+        }
+
+        // Setup VR Controllers & Hand Motion Laser Tracking
+        function setupVRHandPointers() {
+            xrHandController = renderer.xr.getController(0);
+            
+            // Add Visual VR Laser Aiming Line
+            const laserGeo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(0, 0, 0),
+                new THREE.Vector3(0, 0, -10)
+            ]);
+            const laserMat = new THREE.LineBasicMaterial({ color: 0xff0000, linewidth: 2 });
+            laserPointer = new THREE.Line(laserGeo, laserMat);
+            xrHandController.add(laserPointer);
+
+            // VR Trigger / Pinch Event Binding
+            xrHandController.addEventListener('selectstart', () => {
+                if (gameState.isRunning && !gameState.isPaused) {
+                    const tempMatrix = new THREE.Matrix4();
+                    tempMatrix.identity().extractRotation(xrHandController.matrixWorld);
+                    raycaster.ray.origin.setFromMatrixPosition(xrHandController.matrixWorld);
+                    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+                    
+                    shootVR();
+                }
+            });
+
+            scene.add(xrHandController);
+        }
+
+        function shootVR() {
+            if (gameState.isReloading || !gameState.isRunning || gameState.isPaused) return;
+
+            if (gameState.ammo <= 0) {
+                reloadAmmo();
+                return;
+            }
+
+            gameState.ammo--;
+            gameState.shotsFired++;
+            updateAmmoUI();
+
+            audioEngine.playShoot();
+
+            lightFlash.intensity = 4;
+            setTimeout(() => { lightFlash.intensity = 0; }, 50);
+
+            // Collect target meshes for VR Raycasting
+            const targetMeshes = [];
+            monsters.forEach(m => {
+                m.mesh.traverse(child => {
+                    if (child.isMesh) {
+                        child.userData.monster = m;
+                        targetMeshes.push(child);
+                    }
+                });
+            });
+
+            const intersects = raycaster.intersectObjects(targetMeshes);
+
+            if (intersects.length > 0) {
+                gameState.shotsHit++;
+                const hitMonster = intersects[0].object.userData.monster;
+                if (hitMonster) {
+                    hitMonster.takeDamage(35);
+                }
+            }
+        }
+
+        // WebXR Aware Animation Loop
+        function gameLoop() {
+            renderer.setAnimationLoop((time, frame) => {
+                const delta = 0.016;
+
+                if (gameState.isRunning && !gameState.isPaused) {
+                    // Process Camera Hand Tracking (Non-VR Mode)
+                    if (!gameState.isVR) {
+                        processHandTracking();
+                    }
+
+                    // Update Monsters & FX
+                    monsters.forEach(m => m.update(delta));
+                    updateParticles(delta);
+
+                    // Update Boss Health Bar
+                    if (gameState.activeBoss && !gameState.activeBoss.isDead) {
+                        const hpPct = Math.max(0, (gameState.activeBoss.hp / gameState.activeBoss.maxHp) * 100);
+                        DOM.bossHpBar.style.width = `${hpPct}%`;
+                        DOM.bossHpText.textContent = `${Math.round(hpPct)}%`;
+                    }
+
+                    // Render Three.js Scene
+                    renderer.render(scene, camera);
+                }
+            });
+        }
+
+            init() {
+                if (this.isInit) return;
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                this.ctx = new AudioCtx();
+                this.isInit = true;
+            }
+
+            playShoot() {
+                if (!gameState.audioEnabled || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                const filter = this.ctx.createBiquadFilter();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(30, this.ctx.currentTime + 0.18);
+
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(2000, this.ctx.currentTime);
+                filter.frequency.linearRampToValueAtTime(200, this.ctx.currentTime + 0.18);
+
+                gain.gain.setValueAtTime(0.8, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.18);
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.18);
+            }
+
+            playHit() {
+                if (!gameState.audioEnabled || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.1);
+
+                gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.1);
+            }
+
+            playReload() {
+                if (!gameState.audioEnabled || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                // Mechanical Click 1
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, now);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.08);
+
+                // Mechanical Slide Click 2
+                const osc2 = this.ctx.createOscillator();
+                const gain2 = this.ctx.createGain();
+                osc2.type = 'sawtooth';
+                osc2.frequency.setValueAtTime(400, now + 0.25);
+                gain2.gain.setValueAtTime(0.4, now + 0.25);
+                gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                osc2.connect(gain2);
+                gain2.connect(this.ctx.destination);
+                osc2.start(now + 0.25);
+                osc2.stop(now + 0.4);
+            }
+
+            playMonsterGrowl() {
+                if (!gameState.audioEnabled || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(60 + Math.random() * 40, this.ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(30, this.ctx.currentTime + 0.6);
+
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.6);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.6);
+            }
+
+            playPlayerHurt() {
+                if (!gameState.audioEnabled || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(100, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(200, this.ctx.currentTime + 0.2);
+
+                gain.gain.setValueAtTime(0.7, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.25);
+            }
+        }
+
+        const audioEngine = new HorrorAudioEngine();
+
+        // Three.js Scene Setup
+        let scene, camera, renderer, raycaster;
+        const monsters = [];
+        const particles = [];
+        let lightFlash;
+
+        function initThreeJS() {
+            scene = new THREE.Scene();
+
+            // Atmospheric Horror Fog
+            scene.fog = new THREE.FogExp2(0x0a0204, 0.08);
+
+            // Camera Setup
+            camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 0, 0);
+
+            // WebGL Renderer Setup
+            renderer = new THREE.WebGLRenderer({
+                canvas: DOM.canvas,
+                alpha: true,
+                antialias: false, // Performance optimization for iOS Safari
+                powerPreference: "high-performance"
+            });
+            
+            updateRendererSize();
+
+            // Ambient & Horror Red Lighting
+            const ambientLight = new THREE.AmbientLight(0x221111, 1.2);
+            scene.add(ambientLight);
+
+            const redDirLight = new THREE.DirectionalLight(0xff1100, 1.5);
+            redDirLight.position.set(0, 5, 2);
+            scene.add(redDirLight);
+
+            lightFlash = new THREE.PointLight(0xffffff, 0, 15);
+            lightFlash.position.set(0, 0, 0);
+            scene.add(lightFlash);
+
+            // Raycaster for shooting logic
+            raycaster = new THREE.Raycaster();
+
+            // Floating Dust Particles
+            createFloatingDust();
+        }
+
+        function updateRendererSize() {
+            if (!renderer || !camera) return;
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            
+            let scale = 0.75; // medium default
+            if (gameState.graphicsQuality === 'high') scale = 1.0;
+            if (gameState.graphicsQuality === 'low') scale = 0.5;
+
+            renderer.setSize(w, h, false);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, scale * 1.5));
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+        }
+
+        // Floating Atmospheric Particles
+        function createFloatingDust() {
+            const particleCount = 60;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+
+            for (let i = 0; i < particleCount * 3; i += 3) {
+                positions[i] = (Math.random() - 0.5) * 12;
+                positions[i + 1] = (Math.random() - 0.5) * 10;
+                positions[i + 2] = -Math.random() * 12;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const material = new THREE.PointsMaterial({
+                color: 0xef4444,
+                size: 0.05,
+                transparent: true,
+                opacity: 0.6
+            });
+
+            const dust = new THREE.Points(geometry, material);
+            scene.add(dust);
+        }
+
+        // Procedural Scary Monster Generator
+        class Monster {
+            constructor(type, waveFactor = 1) {
+                this.type = type; // 'crawler', 'stalker', 'specter', 'brute', 'boss'
+                this.mesh = new THREE.Group();
+                this.isDead = false;
+                this.animationTime = Math.random() * 10;
+
+                // Configure Stats
+                switch (type) {
+                    case 'crawler':
+                        this.maxHp = 20 * waveFactor;
+                        this.speed = 1.6 + Math.random() * 0.4;
+                        this.damage = 10;
+                        this.scale = 0.6;
+                        this.yOffset = -1.2;
+                        break;
+                    case 'stalker':
+                        this.maxHp = 35 * waveFactor;
+                        this.speed = 1.1 + Math.random() * 0.3;
+                        this.damage = 15;
+                        this.scale = 1.0;
+                        this.yOffset = -0.5;
+                        break;
+                    case 'specter':
+                        this.maxHp = 25 * waveFactor;
+                        this.speed = 1.4;
+                        this.damage = 12;
+                        this.scale = 0.9;
+                        this.yOffset = 0.2;
+                        break;
+                    case 'brute':
+                        this.maxHp = 80 * waveFactor;
+                        this.speed = 0.6;
+                        this.damage = 25;
+                        this.scale = 1.5;
+                        this.yOffset = -0.6;
+                        break;
+                    case 'boss':
+                        this.maxHp = 300 * waveFactor;
+                        this.speed = 0.45;
+                        this.damage = 35;
+                        this.scale = 2.4;
+                        this.yOffset = -0.8;
+                        break;
+                }
+
+                this.hp = this.maxHp;
+                this.buildProceduralModel();
+                this.spawn();
+            }
+
+            buildProceduralModel() {
+                const bodyMat = new THREE.MeshStandardMaterial({
+                    color: this.type === 'specter' ? 0x225566 : (this.type === 'boss' ? 0x2d0505 : 0x111111),
+                    roughness: 0.8,
+                    metalness: 0.2,
+                    transparent: this.type === 'specter',
+                    opacity: this.type === 'specter' ? 0.65 : 1.0
+                });
+
+                const eyeMat = new THREE.MeshBasicMaterial({
+                    color: this.type === 'boss' ? 0xff0000 : (this.type === 'specter' ? 0x00ffff : 0xff2200)
+                });
+
+                // Torso / Core
+                const torsoGeo = new THREE.CylinderGeometry(0.2, 0.3, 1.2, 6);
+                const torso = new THREE.Mesh(torsoGeo, bodyMat);
+                torso.position.y = 0.6;
+                this.mesh.add(torso);
+
+                // Deformed Head
+                const headGeo = new THREE.DodecahedronGeometry(0.25, 1);
+                const head = new THREE.Mesh(headGeo, bodyMat);
+                head.position.set(0, 1.3, 0);
+                this.mesh.add(head);
+
+                // Glowing Eyes
+                const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), eyeMat);
+                eyeL.position.set(-0.09, 1.35, 0.2);
+                const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), eyeMat);
+                eyeR.position.set(0.09, 1.35, 0.2);
+                this.mesh.add(eyeL, eyeR);
+
+                // Elongated Limbs
+                this.limbs = [];
+                const limbCount = this.type === 'crawler' ? 4 : 2;
+                for (let i = 0; i < limbCount; i++) {
+                    const limbGeo = new THREE.BoxGeometry(0.08, 0.9, 0.08);
+                    const limb = new THREE.Mesh(limbGeo, bodyMat);
+                    const side = i % 2 === 0 ? 1 : -1;
+                    limb.position.set(side * 0.35, 0.5, 0);
+                    this.mesh.add(limb);
+                    this.limbs.push(limb);
+                }
+
+                // Scale & Setup Group
+                this.mesh.scale.set(this.scale, this.scale, this.scale);
+                this.mesh.userData = { monster: this };
+                scene.add(this.mesh);
+            }
+
+            spawn() {
+                // Random spawn angle in front arc
+                const angle = (Math.random() - 0.5) * Math.PI * 0.8;
+                const distance = 8 + Math.random() * 4;
+
+                this.mesh.position.x = Math.sin(angle) * distance;
+                this.mesh.position.z = -Math.cos(angle) * distance;
+                this.mesh.position.y = this.yOffset;
+
+                // Face the camera
+                this.mesh.lookAt(0, this.mesh.position.y, 0);
+            }
+
+            update(delta) {
+                if (this.isDead) return;
+
+                this.animationTime += delta * 4;
+
+                // Walk / Float Wobble Animation
+                this.mesh.position.y = this.yOffset + Math.sin(this.animationTime * 2) * 0.08;
+                this.limbs.forEach((limb, idx) => {
+                    limb.rotation.x = Math.sin(this.animationTime + idx) * 0.4;
+                });
+
+                // Move toward player camera
+                const dir = new THREE.Vector3(0, this.yOffset, 0).sub(this.mesh.position).normalize();
+                this.mesh.position.addScaledVector(dir, this.speed * delta);
+                this.mesh.lookAt(0, this.mesh.position.y, 0);
+
+                // Distance to Player check for attack
+                const dist = this.mesh.position.distanceTo(new THREE.Vector3(0, this.yOffset, 0));
+                if (dist < 1.2) {
+                    this.attackPlayer();
+                }
+            }
+
+            takeDamage(amount) {
+                this.hp -= amount;
+
+                // Visual knockback / hit wobble
+                this.mesh.position.z += 0.2;
+                audioEngine.playHit();
+
+                // Spawn blood/spark particles
+                spawnHitParticles(this.mesh.position);
+
+                if (this.hp <= 0) {
+                    this.die();
+                }
+            }
+
+            attackPlayer() {
+                damagePlayer(this.damage);
+                audioEngine.playMonsterGrowl();
+                // Push back monster slightly after attack
+                this.mesh.position.z -= 1.5;
+            }
+
+            die() {
+                if (this.isDead) return;
+                this.isDead = true;
+
+                // Add to score
+                const points = this.type === 'boss' ? 500 : 100;
+                addScore(points);
+
+                // Fade/Collapse Animation
+                scene.remove(this.mesh);
+
+                // Remove from active array
+                const idx = monsters.indexOf(this);
+                if (idx > -1) monsters.splice(idx, 1);
+
+                checkWaveCompletion();
+            }
+        }
+
+        function spawnHitParticles(pos) {
+            const count = 12;
+            for (let i = 0; i < count; i++) {
+                const pGeo = new THREE.SphereGeometry(0.03, 4, 4);
+                const pMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+                const p = new THREE.Mesh(pGeo, pMat);
+                p.position.copy(pos);
+                p.userData.vel = new THREE.Vector3(
+                    (Math.random() - 0.5) * 2,
+                    (Math.random() - 0.5) * 2,
+                    (Math.random() - 0.5) * 2
+                );
+                p.userData.life = 0.3;
+                scene.add(p);
+                particles.push(p);
+            }
+        }
+
+        function updateParticles(delta) {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.userData.life -= delta;
+                p.position.addScaledVector(p.userData.vel, delta);
+                if (p.userData.life <= 0) {
+                    scene.remove(p);
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        // Player & Wave Management
+        function damagePlayer(amount) {
+            gameState.health = Math.max(0, gameState.health - amount);
+            DOM.healthBar.style.width = `${(gameState.health / gameState.maxHealth) * 100}%`;
+            DOM.healthNum.textContent = Math.round(gameState.health);
+
+            // Flash screen red
+            DOM.damageFlash.style.opacity = '1';
+            setTimeout(() => { DOM.damageFlash.style.opacity = '0'; }, 200);
+
+            audioEngine.playPlayerHurt();
+
+            if (gameState.health <= 0) {
+                gameOver();
+            }
+        }
+
+        function addScore(pts) {
+            gameState.score += pts;
+            DOM.scoreDisplay.textContent = `SCORE: ${gameState.score}`;
+        }
+
+        function startNextWave() {
+            monsters.forEach(m => scene.remove(m.mesh));
+            monsters.length = 0;
+
+            const isBossWave = gameState.wave % 5 === 0;
+
+            showAnnouncement(
+                `WAVE ${gameState.wave}`,
+                isBossWave ? "WARNING: ALPHA ENTITY DETECTED!" : "SURVIVE THE HORDE"
+            );
+
+            DOM.waveDisplay.textContent = `WAVE ${gameState.wave}`;
+
+            // Partial health recovery & ammo refill on wave start
+            gameState.health = Math.min(gameState.maxHealth, gameState.health + 25);
+            DOM.healthBar.style.width = `${(gameState.health / gameState.maxHealth) * 100}%`;
+            DOM.healthNum.textContent = Math.round(gameState.health);
+            reloadAmmo();
+
+            // Spawn Monster Wave
+            setTimeout(() => {
+                if (!gameState.isRunning) return;
+
+                if (isBossWave) {
+                    const boss = new Monster('boss', gameState.wave);
+                    monsters.push(boss);
+                    gameState.activeBoss = boss;
+                    DOM.bossHud.classList.remove('hidden');
+                    DOM.bossHud.classList.add('flex');
+                    DOM.bossName.textContent = "ALPHA ENTITY";
+                } else {
+                    DOM.bossHud.classList.add('hidden');
+                    DOM.bossHud.classList.remove('flex');
+                    gameState.activeBoss = null;
+
+                    const count = 3 + Math.floor(gameState.wave * 1.5);
+                    const types = ['crawler', 'stalker', 'specter', 'brute'];
+
+                    for (let i = 0; i < count; i++) {
+                        const type = types[Math.floor(Math.random() * types.length)];
+                        monsters.push(new Monster(type, 1 + gameState.wave * 0.15));
+                    }
+                }
+            }, 2000);
+        }
+
+        function checkWaveCompletion() {
+            if (monsters.length === 0 && gameState.isRunning) {
+                gameState.wave++;
+                if (gameState.wave > gameState.maxWave) {
+                    gameState.maxWave = gameState.wave;
+                    localStorage.setItem('ar_nightmare_maxwave', gameState.maxWave.toString());
+                }
+                setTimeout(startNextWave, 1500);
+            }
+        }
+
+        function showAnnouncement(title, subtitle) {
+            DOM.announceTitle.textContent = title;
+            DOM.announceSubtitle.textContent = subtitle;
+            DOM.announcement.style.opacity = '1';
+            setTimeout(() => {
+                DOM.announcement.style.opacity = '0';
+            }, 2200);
+        }
+
+        // Weapons & Shooting Logic
+        function shoot(reticleX, reticleY) {
+            if (gameState.isReloading || !gameState.isRunning || gameState.isPaused) return;
+
+            if (gameState.ammo <= 0) {
+                reloadAmmo();
+                return;
+            }
+
+            gameState.ammo--;
+            gameState.shotsFired++;
+            updateAmmoUI();
+
+            audioEngine.playShoot();
+
+            // Muzzle Flash Light
+            lightFlash.intensity = 4;
+            setTimeout(() => { lightFlash.intensity = 0; }, 50);
+
+            // Calculate Raycast from Reticle Screen Coordinates
+            const mouse = new THREE.Vector2(
+                (reticleX / window.innerWidth) * 2 - 1,
+                -(reticleY / window.innerHeight) * 2 + 1
+            );
+
+            raycaster.setFromCamera(mouse, camera);
+
+            // Collect target meshes
+            const targetMeshes = [];
+            monsters.forEach(m => {
+                m.mesh.traverse(child => {
+                    if (child.isMesh) {
+                        child.userData.monster = m;
+                        targetMeshes.push(child);
+                    }
+                });
+            });
+
+            const intersects = raycaster.intersectObjects(targetMeshes);
+
+            if (intersects.length > 0) {
+                gameState.shotsHit++;
+                const hitMonster = intersects[0].object.userData.monster;
+                if (hitMonster) {
+                    hitMonster.takeDamage(25);
+                }
+            }
+        }
+
+        function reloadAmmo() {
+            if (gameState.isReloading) return;
+            gameState.isReloading = true;
+            DOM.reloadBtn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> RELOADING...`;
+            audioEngine.playReload();
+
+            setTimeout(() => {
+                gameState.ammo = gameState.maxAmmo;
+                gameState.isReloading = false;
+                updateAmmoUI();
+                DOM.reloadBtn.innerHTML = `<i class="fa-solid fa-rotate-right"></i> RELOAD (PINCH / TAP)`;
+            }, 1200);
+        }
+
+        function updateAmmoUI() {
+            DOM.ammoCount.textContent = `${gameState.ammo} / ${gameState.maxAmmo}`;
+        }
+
+        // MediaPipe Hand Tracking Setup
+        let handLandmarker;
+        let lastVideoTime = -1;
+
+        async function initHandTracking() {
+            try {
+                const vision = await FilesetResolver.forVisionTasks(
+                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+                );
+
+                handLandmarker = await HandLandmarker.createFromOptions(vision, {
+                    baseOptions: {
+                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+                        delegate: "GPU"
+                    },
+                    runningMode: "VIDEO",
+                    numHands: 1
+                });
+
+                startCamera();
+            } catch (err) {
+                console.error("Error initializing MediaPipe Hand Landmarker:", err);
+                DOM.trackingText.textContent = "TRACKING ERROR";
+            }
+        }
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: "environment", // iOS Rear Camera
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                });
+
+                DOM.video.srcObject = stream;
+                DOM.video.addEventListener("loadeddata", () => {
+                    DOM.video.play();
+                });
+            } catch (err) {
+                console.error("Camera Access Denied or Unavailable:", err);
+                DOM.trackingText.textContent = "CAMERA ERROR";
+            }
+        }
+
+        function processHandTracking() {
+            if (!handLandmarker || !DOM.video || DOM.video.paused) return;
+
+            if (DOM.video.currentTime !== lastVideoTime) {
+                lastVideoTime = DOM.video.currentTime;
+                const results = handLandmarker.detectForVideo(DOM.video, performance.now());
+
+                if (results.landmarks && results.landmarks.length > 0) {
+                    const landmarks = results.landmarks[0];
+                    gameState.handDetected = true;
+
+                    // Update Hand Tracking Indicator
+                    DOM.trackingDot.className = "w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse";
+                    DOM.trackingText.textContent = "HAND READY";
+                    DOM.reticle.style.display = "block";
+
+                    // Aiming Reticle via Index Tip (Landmark 8)
+                    const indexTip = landmarks[8];
+                    
+                    // Convert normalized coordinates to screen pixel position
+                    // Note: Rear camera stream is direct (unmirrored)
+                    const rawX = indexTip.x * window.innerWidth;
+                    const rawY = indexTip.y * window.innerHeight;
+
+                    // Apply Sensitivity
+                    const centerX = window.innerWidth / 2;
+                    const centerY = window.innerHeight / 2;
+                    const reticleX = centerX + (rawX - centerX) * gameState.sensitivity;
+                    const reticleY = centerY + (rawY - centerY) * gameState.sensitivity;
+
+                    DOM.reticle.style.left = `${reticleX}px`;
+                    DOM.reticle.style.top = `${reticleY}px`;
+
+                    // Pinch Detection: Index Tip (8) to Thumb Tip (4) distance
+                    const thumbTip = landmarks[4];
+                    const dist = Math.hypot(
+                        (indexTip.x - thumbTip.x) * window.innerWidth,
+                        (indexTip.y - thumbTip.y) * window.innerHeight
+                    );
+
+                    const pinchThreshold = 45; // Pixels
+                    const now = performance.now();
+
+                    if (dist < pinchThreshold) {
+                        DOM.reticleRing.classList.add("reticle-pinch");
+                        if (!gameState.isPinching && (now - gameState.lastPinchTime > 220)) {
+                            gameState.isPinching = true;
+                            gameState.lastPinchTime = now;
+                            shoot(reticleX, reticleY);
+                        }
+                    } else {
+                        gameState.isPinching = false;
+                        DOM.reticleRing.classList.remove("reticle-pinch");
+                    }
+
+                } else {
+                    gameState.handDetected = false;
+                    DOM.trackingDot.className = "w-2.5 h-2.5 rounded-full bg-red-600";
+                    DOM.trackingText.textContent = "NO HAND";
+                    DOM.reticle.style.display = "none";
+                }
+            }
+        }
+
+        // Main Game Loop
+        let lastFrameTime = performance.now();
+
+        function gameLoop() {
+            requestAnimationFrame(gameLoop);
+
+            const now = performance.now();
+            const delta = Math.min((now - lastFrameTime) / 1000, 0.1); // Cap delta to prevent leaps
+            lastFrameTime = now;
+
+            if (gameState.isRunning && !gameState.isPaused) {
+                // Process Hand Gesture Tracking
+                processHandTracking();
+
+                // Update Active Monsters
+                monsters.forEach(m => m.update(delta));
+
+                // Update Hit Particles
+                updateParticles(delta);
+
+                // Update Boss Health Bar
+                if (gameState.activeBoss && !gameState.activeBoss.isDead) {
+                    const hpPct = Math.max(0, (gameState.activeBoss.hp / gameState.activeBoss.maxHp) * 100);
+                    DOM.bossHpBar.style.width = `${hpPct}%`;
+                    DOM.bossHpText.textContent = `${Math.round(hpPct)}%`;
+                }
+
+                // Render Three.js Scene
+                renderer.render(scene, camera);
+            }
+        }
+
+        // Game State Controller Functions
+        function startGame() {
+            audioEngine.init();
+
+            gameState.isRunning = true;
+            gameState.isPaused = false;
+            gameState.score = 0;
+            gameState.wave = 1;
+            gameState.health = 100;
+            gameState.ammo = 12;
+            gameState.shotsFired = 0;
+            gameState.shotsHit = 0;
+
+            DOM.menuModal.classList.add('hidden');
+            DOM.hud.classList.remove('hidden');
+            DOM.hud.classList.add('flex');
+
+            startNextWave();
+        }
+
+        function gameOver() {
+            gameState.isRunning = false;
+
+            // Check high scores
+            if (gameState.score > gameState.highScore) {
+                gameState.highScore = gameState.score;
+                localStorage.setItem('ar_nightmare_highscore', gameState.highScore.toString());
+            }
+
+            const accuracy = gameState.shotsFired > 0 
+                ? Math.round((gameState.shotsHit / gameState.shotsFired) * 100) 
+                : 0;
+
+            document.getElementById('final-score').textContent = gameState.score;
+            document.getElementById('final-wave').textContent = gameState.wave;
+            document.getElementById('final-accuracy').textContent = `${accuracy}%`;
+
+            DOM.hud.classList.add('hidden');
+            DOM.gameoverModal.classList.remove('hidden');
+            DOM.gameoverModal.classList.add('flex');
+        }
+
+        // Event Listeners & UI Binding
+        document.getElementById('start-btn').addEventListener('click', startGame);
+        
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            DOM.gameoverModal.classList.add('hidden');
+            startGame();
+        });
+
+        DOM.reloadBtn.addEventListener('click', reloadAmmo);
+
+        document.getElementById('pause-btn').addEventListener('click', () => {
+            gameState.isPaused = true;
+            DOM.pauseModal.classList.remove('hidden');
+            DOM.pauseModal.classList.add('flex');
+        });
+
+        document.getElementById('resume-btn').addEventListener('click', () => {
+            gameState.isPaused = false;
+            DOM.pauseModal.classList.add('hidden');
+        });
+
+        document.getElementById('restart-pause-btn').addEventListener('click', () => {
+            DOM.pauseModal.classList.add('hidden');
+            startGame();
+        });
+
+        document.getElementById('quit-btn').addEventListener('click', () => {
+            gameState.isRunning = false;
+            gameState.isPaused = false;
+            DOM.pauseModal.classList.add('hidden');
+            DOM.hud.classList.add('hidden');
+            DOM.menuModal.classList.remove('hidden');
+
+            // Refresh High Scores display
+            DOM.menuHighScore.textContent = gameState.highScore;
+            DOM.menuMaxWave.textContent = gameState.maxWave;
+        });
+
+        // Settings Modal Binding
+        const settingsModal = DOM.settingsModal;
+        document.getElementById('settings-toggle-btn').addEventListener('click', () => {
+            settingsModal.classList.remove('hidden');
+            settingsModal.classList.add('flex');
+        });
+
+        document.getElementById('close-settings-btn').addEventListener('click', () => {
+            settingsModal.classList.add('hidden');
+        });
+
+        document.getElementById('save-settings-btn').addEventListener('click', () => {
+            settingsModal.classList.add('hidden');
+        });
+
+        // Audio Toggle
+        const audioBtn = document.getElementById('audio-toggle-btn');
+        audioBtn.addEventListener('click', () => {
+            gameState.audioEnabled = !gameState.audioEnabled;
+            audioBtn.textContent = gameState.audioEnabled ? 'ENABLED' : 'MUTED';
+            audioBtn.className = gameState.audioEnabled 
+                ? 'px-3 py-1 rounded-md glass-panel text-green-400 border-green-500/40 font-bold'
+                : 'px-3 py-1 rounded-md glass-panel text-red-400 border-red-500/40 font-bold';
+        });
+
+        // Sensitivity Slider
+        const sensSlider = document.getElementById('sens-slider');
+        const sensVal = document.getElementById('sens-val');
+        sensSlider.addEventListener('input', (e) => {
+            gameState.sensitivity = parseFloat(e.target.value);
+            sensVal.textContent = `${gameState.sensitivity.toFixed(1)}x`;
+        });
+
+        // Graphics Quality Selector
+        document.getElementById('graphics-select').addEventListener('change', (e) => {
+            gameState.graphicsQuality = e.target.value;
+            updateRendererSize();
+        });
+
+        // Handle Window Resize
+        window.addEventListener('resize', updateRendererSize);
+
+        // Fallback Touch Shooting for non-hand debug / alternate input
+        window.addEventListener('touchstart', (e) => {
+            if (gameState.isRunning && !gameState.isPaused && !gameState.handDetected) {
+                // Only shoot if tap is not on UI buttons
+                if (e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
+                    const touch = e.touches[0];
+                    shoot(touch.clientX, touch.clientY);
+                }
+            }
+        });
+
+        // System Initialization
+        window.onload = () => {
+            initThreeJS();
+            initHandTracking();
+            gameLoop();
+        };
+    </script>
 </body>
 </html>
