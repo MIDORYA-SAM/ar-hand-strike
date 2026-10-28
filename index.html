@@ -1,614 +1,462 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
-    <title>VR Mobile Passthrough & Hand Tracking Prototype</title>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Three.js para renderização 3D -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    
-    <!-- MediaPipe Hands & Camera Utils -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>VR Mobile - Rastreamento de Mãos & Coletáveis</title>
 
-    <!-- FontAwesome para Ícones -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Three.js (Motor 3D) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
-    <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #000;
-            font-family: system-ui, -apple-system, sans-serif;
-            user-select: none;
-            -webkit-user-select: none;
-        }
+  <!-- MediaPipe Hands & Camera Utils -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
 
-        #webcam-video {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 1px;
-            height: 1px;
-            opacity: 0.01;
-            pointer-events: none;
-        }
+  <!-- MediaPipe Hands SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
-        .vr-viewport {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-        }
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
 
-        .eye-view {
-            position: relative;
-            flex: 1;
-            height: 100%;
-            overflow: hidden;
-        }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #fff;
+    }
 
-        .split-vr .eye-view {
-            border-right: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        .split-vr .eye-view:last-child {
-            border-right: none;
-        }
+    /* Elementos de Câmera e Canvas 3D */
+    #webcam {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 1;
+      transform: scaleX(1); /* Sem espelhamento para câmera traseira */
+    }
 
-        .reticle {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 8px;
-            height: 8px;
-            background-color: rgba(255, 255, 255, 0.8);
-            border: 2px solid rgba(0, 0, 0, 0.5);
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 10;
-        }
-    </style>
+    #canvas-3d {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    /* Painel HUD/UI Overlay */
+    #ui-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 16px;
+    }
+
+    .hud-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(8px);
+      padding: 12px 18px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      pointer-events: auto;
+    }
+
+    .score-badge {
+      font-size: 18px;
+      font-weight: 700;
+      color: #ffd700;
+      text-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+    }
+
+    .status-badge {
+      font-size: 13px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: #333;
+      color: #aaa;
+      font-weight: 600;
+    }
+
+    .status-badge.active {
+      background: #2e7d32;
+      color: #fff;
+    }
+
+    /* Controles Inferiores */
+    .hud-controls {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      pointer-events: auto;
+      margin-bottom: 10px;
+    }
+
+    .btn {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 30px;
+      font-weight: 600;
+      font-size: 14px;
+      backdrop-filter: blur(10px);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn:active {
+      transform: scale(0.95);
+      background: rgba(255, 255, 255, 0.4);
+    }
+
+    /* Divisor Stereo (Modo VR Cardboard) */
+    #vr-divider {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      width: 2px;
+      height: 100%;
+      background: #000;
+      z-index: 5;
+      display: none;
+      transform: translateX(-50%);
+    }
+
+    body.vr-mode #vr-divider {
+      display: block;
+    }
+
+    /* Mensagem de Erro/Aviso */
+    #msg-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.85);
+      padding: 20px;
+      border-radius: 12px;
+      text-align: center;
+      z-index: 20;
+      display: none;
+      max-width: 80%;
+    }
+  </style>
 </head>
-<body class="bg-black text-white select-none">
+<body>
 
-    <!-- Elemento de Vídeo com todos os atributos obrigatórios para iOS/Android -->
-    <video id="webcam-video" playsinline webkit-playsinline muted autoplay></video>
+  <!-- Elemento de Vídeo para Entrada da Câmera -->
+  <video id="webcam" autoplay playsinline muted></video>
 
-    <!-- Viewport VR / AR -->
-    <div id="app-container" class="vr-viewport split-vr">
-        <div id="left-eye" class="eye-view">
-            <canvas id="canvas-left" class="w-full h-full block"></canvas>
-            <div class="reticle"></div>
-        </div>
+  <!-- Canvas 3D do Three.js -->
+  <canvas id="canvas-3d"></canvas>
 
-        <div id="right-eye" class="eye-view">
-            <canvas id="canvas-right" class="w-full h-full block"></canvas>
-            <div class="reticle"></div>
-        </div>
+  <!-- Divisor do Modo VR -->
+  <div id="vr-divider"></div>
+
+  <!-- Interface HUD -->
+  <div id="ui-container">
+    <div class="hud-header">
+      <div class="score-badge">🪙 <span id="score-val">0</span></div>
+      <div id="hand-status" class="status-badge">Aguardando Câmera...</div>
     </div>
 
-    <!-- UI Overlay (Menu de Controle e Status) -->
-    <div class="fixed top-0 left-0 w-full p-4 z-20 flex justify-between items-center pointer-events-none">
-        <div class="bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-2 border border-white/20 pointer-events-auto max-w-[60%] truncate">
-            <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-yellow-500 animate-pulse shrink-0"></span>
-            <span id="status-text" class="truncate">Aguardando início...</span>
-        </div>
-
-        <div class="flex gap-2 pointer-events-auto">
-            <button id="btn-switch-camera" class="bg-gray-800/80 hover:bg-gray-700 text-white p-3 rounded-full shadow-lg border border-white/30 transition flex items-center justify-center w-11 h-11" title="Alternar Câmera">
-                <i class="fa-solid fa-camera-rotate text-lg"></i>
-            </button>
-            <button id="btn-toggle-vr" class="bg-indigo-600 hover:bg-indigo-500 text-white p-3 rounded-full shadow-lg border border-white/30 transition flex items-center justify-center w-11 h-11" title="Alternar Modo VR/AR">
-                <i class="fa-solid fa-vr-cardboard text-lg"></i>
-            </button>
-            <button id="btn-fullscreen" class="bg-gray-800/80 hover:bg-gray-700 text-white p-3 rounded-full shadow-lg border border-white/30 transition flex items-center justify-center w-11 h-11" title="Tela Cheia">
-                <i class="fa-solid fa-expand text-lg"></i>
-            </button>
-        </div>
+    <div class="hud-controls">
+      <button class="btn" id="btn-switch-cam">🔄 Inverter Câmera</button>
+      <button class="btn" id="btn-toggle-vr">🥽 Modo VR / AR</button>
     </div>
-
-    <!-- Console de Debug na Tela (Oculto por padrão, exibe erros se houver) -->
-    <div id="debug-log" class="fixed bottom-2 left-2 right-2 z-30 bg-black/90 text-red-400 font-mono text-xs p-3 rounded-xl border border-red-500/30 hidden max-h-32 overflow-y-auto pointer-events-auto">
-    </div>
-
-    <!-- Modal Inicial -->
-    <div id="start-modal" class="fixed inset-0 bg-black/90 backdrop-blur-lg z-50 flex items-center justify-center p-6 text-center">
-        <div class="max-w-md bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-2xl">
-            <div class="w-16 h-16 bg-indigo-600/20 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl border border-indigo-500/30">
-                <i class="fa-solid fa-camera"></i>
-            </div>
-            <h1 class="text-xl font-bold mb-2">Protótipo VR Passthrough</h1>
-            <p class="text-gray-400 text-sm mb-6">
-                Este aplicativo utiliza a <b>câmera traseira</b> como fundo VR para interagir com objetos 3D usando suas mãos.
-            </p>
-            <button id="btn-start" class="w-full py-3.5 px-6 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl shadow-lg transition duration-200 text-sm flex items-center justify-center gap-2">
-                <i class="fa-solid fa-play"></i> Iniciar Câmera & VR
-            </button>
-        </div>
-    </div>
-
-    <script>
-        // Estado Global
-        let isVRMode = true;
-        let cameraStream = null;
-        let handDetector = null;
-        let mediaPipeCamera = null;
-        let videoTexture = null;
-        let videoPlaneMesh = null;
-        let currentFacingMode = "environment";
-        let isInitialized = false;
-
-        // Three.js
-        let scene, cameraLeft, cameraRight, rendererLeft, rendererRight;
-        let interactiveObjects = [];
-        let handJoints3D = [];
-        let handBones3D = [];
-
-        // Conexões das articulações da mão (MediaPipe Hand Connections)
-        const HAND_CONNECTIONS = [
-            [0,1],[1,2],[2,3],[3,4],        // Polegar
-            [0,5],[5,6],[6,7],[7,8],        // Indicador
-            [5,9],[9,10],[10,11],[11,12],   // Médio
-            [9,13],[13,14],[14,15],[15,16], // Anelar
-            [13,17],[17,18],[18,19],[19,20],[0,17] // Mínimo & Palma
-        ];
-
-        // Elementos DOM
-        const videoElement = document.getElementById('webcam-video');
-        const container = document.getElementById('app-container');
-        const rightEye = document.getElementById('right-eye');
-        const statusText = document.getElementById('status-text');
-        const statusDot = document.getElementById('status-dot');
-        const startModal = document.getElementById('start-modal');
-        const btnStart = document.getElementById('btn-start');
-        const btnSwitchCamera = document.getElementById('btn-switch-camera');
-        const btnToggleVR = document.getElementById('btn-toggle-vr');
-        const btnFullscreen = document.getElementById('btn-fullscreen');
-        const debugLog = document.getElementById('debug-log');
-
-        function logError(msg) {
-            console.error(msg);
-            debugLog.classList.remove('hidden');
-            debugLog.innerHTML += `<div>> ${msg}</div>`;
-        }
-
-        function updateStatus(text, type = "loading") {
-            statusText.innerText = text;
-            if (type === "ok") {
-                statusDot.className = "w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shrink-0";
-            } else if (type === "error") {
-                statusDot.className = "w-2.5 h-2.5 rounded-full bg-red-500 shrink-0";
-            } else {
-                statusDot.className = "w-2.5 h-2.5 rounded-full bg-yellow-500 animate-pulse shrink-0";
-            }
-        }
-
-        // --- ESTRATÉGIA ROBUSTA DE CAPTURA DE CÂMERA ---
-        async function getRearCameraDeviceId() {
-            try {
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const videoDevices = devices.filter(d => d.kind === 'videoinput');
-                
-                // Procurar por palavras-chave de câmera traseira no label
-                const rearDevice = videoDevices.find(d => 
-                    d.label.toLowerCase().includes('back') || 
-                    d.label.toLowerCase().includes('rear') || 
-                    d.label.toLowerCase().includes('environment') ||
-                    d.label.toLowerCase().includes('traseira')
-                );
-
-                if (rearDevice) return rearDevice.deviceId;
-                if (videoDevices.length > 1) return videoDevices[videoDevices.length - 1].deviceId; // Geralmente a última é a traseira
-                if (videoDevices.length > 0) return videoDevices[0].deviceId;
-            } catch (e) {
-                console.warn("Não foi possível enumerar dispositivos:", e);
-            }
-            return null;
-        }
-
-        async function startCamera(targetFacingMode = "environment") {
-            try {
-                updateStatus("Solicitando acesso à câmera...");
-
-                if (cameraStream) {
-                    cameraStream.getTracks().forEach(track => track.stop());
-                }
-
-                currentFacingMode = targetFacingMode;
-                let stream = null;
-
-                // Tentar 1: ideal facingMode (Mais seguro para mobile)
-                try {
-                    stream = await navigator.mediaDevices.getUserMedia({
-                        video: {
-                            facingMode: { ideal: targetFacingMode },
-                            width: { ideal: 1280 },
-                            height: { ideal: 720 }
-                        },
-                        audio: false
-                    });
-                } catch (e1) {
-                    console.warn("Tentativa 1 com facingMode ideal falhou, buscando deviceId...", e1);
-                    
-                    // Tentar 2: Busca explicita de DeviceID se for câmera traseira
-                    if (targetFacingMode === "environment") {
-                        const deviceId = await getRearCameraDeviceId();
-                        if (deviceId) {
-                            try {
-                                stream = await navigator.mediaDevices.getUserMedia({
-                                    video: { deviceId: { exact: deviceId } },
-                                    audio: false
-                                });
-                            } catch (e2) {
-                                console.warn("Tentativa 2 com DeviceID falhou...", e2);
-                            }
-                        }
-                    }
-
-                    // Tentar 3: Câmera genérica sem restrições
-                    if (!stream) {
-                        stream = await navigator.mediaDevices.getUserMedia({
-                            video: true,
-                            audio: false
-                        });
-                    }
-                }
-
-                if (!stream) {
-                    throw new Error("Não foi possível obter fluxo de vídeo da câmera.");
-                }
-
-                cameraStream = stream;
-                videoElement.srcObject = cameraStream;
-
-                // Garantir execução no iOS/Safari
-                await new Promise((resolve) => {
-                    videoElement.onloadedmetadata = () => {
-                        videoElement.play().then(resolve).catch(resolve);
-                    };
-                });
-
-                updateStatus(`Procurando mãos...`, "loading");
-
-                // Atualizar ou criar textura de vídeo no Three.js
-                setupVideoTexture();
-
-            } catch (err) {
-                logError(`Erro de Câmera: ${err.name} - ${err.message}`);
-                updateStatus("Falha ao abrir câmera", "error");
-            }
-        }
-
-        async function switchCamera() {
-            const nextMode = currentFacingMode === "environment" ? "user" : "environment";
-            await startCamera(nextMode);
-        }
-
-        // --- THREE.JS CENA E TEXTURA ---
-        function initThreeJS() {
-            const width = window.innerWidth;
-            const height = window.innerHeight;
-
-            scene = new THREE.Scene();
-
-            // Câmeras
-            cameraLeft = new THREE.PerspectiveCamera(60, (width / 2) / height, 0.1, 100);
-            cameraRight = new THREE.PerspectiveCamera(60, (width / 2) / height, 0.1, 100);
-            
-            // Leve separação entre os olhos (IPD)
-            cameraLeft.position.set(-0.03, 0, 0);
-            cameraRight.position.set(0.03, 0, 0);
-
-            // Renderizadores
-            const canvasLeft = document.getElementById('canvas-left');
-            const canvasRight = document.getElementById('canvas-right');
-
-            rendererLeft = new THREE.WebGLRenderer({ canvas: canvasLeft, antialias: true, alpha: true });
-            rendererRight = new THREE.WebGLRenderer({ canvas: canvasRight, antialias: true, alpha: true });
-
-            rendererLeft.setSize(width / 2, height);
-            rendererRight.setSize(width / 2, height);
-            rendererLeft.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            rendererRight.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-            // Iluminação
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-            scene.add(ambientLight);
-
-            const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
-            dirLight.position.set(0, 5, 5);
-            scene.add(dirLight);
-
-            createInteractiveElements();
-            createHandSkeleton();
-
-            window.addEventListener('resize', onWindowResize);
-        }
-
-        function setupVideoTexture() {
-            if (!videoTexture) {
-                videoTexture = new THREE.VideoTexture(videoElement);
-                videoTexture.minFilter = THREE.LinearFilter;
-                videoTexture.magFilter = THREE.LinearFilter;
-                videoTexture.format = THREE.RGBAFormat;
-
-                const geometry = new THREE.PlaneGeometry(16, 9);
-                const material = new THREE.MeshBasicMaterial({
-                    map: videoTexture,
-                    depthTest: false,
-                    depthWrite: false
-                });
-
-                videoPlaneMesh = new THREE.Mesh(geometry, material);
-                videoPlaneMesh.position.set(0, 0, -5);
-                videoPlaneMesh.renderOrder = -1;
-                scene.add(videoPlaneMesh);
-            } else {
-                videoTexture.needsUpdate = true;
-            }
-        }
-
-        function createInteractiveElements() {
-            const colors = [0x00ffcc, 0xff0077, 0x7700ff, 0xffaa00, 0x00ff66];
-            
-            for (let i = 0; i < 5; i++) {
-                const geom = (i % 2 === 0) 
-                    ? new THREE.IcosahedronGeometry(0.2, 1) 
-                    : new THREE.BoxGeometry(0.25, 0.25, 0.25);
-
-                const mat = new THREE.MeshStandardMaterial({
-                    color: colors[i % colors.length],
-                    wireframe: i % 2 === 0,
-                    roughness: 0.3,
-                    metalness: 0.7
-                });
-
-                const mesh = new THREE.Mesh(geom, mat);
-                
-                const angle = (i / 5) * Math.PI * 0.6 - (Math.PI * 0.3);
-                mesh.position.x = Math.sin(angle) * 1.5;
-                mesh.position.y = (Math.random() - 0.5) * 0.5;
-                mesh.position.z = -Math.cos(angle) * 1.5;
-
-                mesh.userData = { 
-                    rotSpeedX: (Math.random() - 0.5) * 0.02,
-                    rotSpeedY: (Math.random() - 0.5) * 0.02,
-                    initialY: mesh.position.y
-                };
-
-                interactiveObjects.push(mesh);
-                scene.add(mesh);
-            }
-        }
-
-        function createHandSkeleton() {
-            // Criar 21 esferas para as articulações da mão
-            const jointGeometry = new THREE.SphereGeometry(0.02, 16, 16);
-            
-            for (let i = 0; i < 21; i++) {
-                const jointMaterial = new THREE.MeshStandardMaterial({
-                    color: i === 8 ? 0xff0055 : 0x00ffcc, // Destaque na ponta do indicador (8)
-                    emissive: i === 8 ? 0xaa0033 : 0x006644,
-                    roughness: 0.2
-                });
-                const jointMesh = new THREE.Mesh(jointGeometry, jointMaterial);
-                jointMesh.visible = false;
-                scene.add(jointMesh);
-                handJoints3D.push(jointMesh);
-            }
-
-            // Criar ossos (cilindros) para conectar as articulações
-            const boneMaterial = new THREE.MeshBasicMaterial({
-                color: 0x00ffaa,
-                transparent: true,
-                opacity: 0.8
-            });
-
-            HAND_CONNECTIONS.forEach(() => {
-                const boneGeometry = new THREE.CylinderGeometry(0.008, 0.008, 1, 8);
-                const boneMesh = new THREE.Mesh(boneGeometry, boneMaterial);
-                boneMesh.visible = false;
-                scene.add(boneMesh);
-                handBones3D.push(boneMesh);
-            });
-        }
-
-        // --- MEDIAPIPE HAND TRACKING ---
-        function initHandTracking() {
-            try {
-                handDetector = new Hands({
-                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-                });
-
-                handDetector.setOptions({
-                    maxNumHands: 1,
-                    modelComplexity: 1,
-                    minDetectionConfidence: 0.5,
-                    minTrackingConfidence: 0.5
-                });
-
-                handDetector.onResults(onHandResults);
-
-                // Inicializar Camera Utils do MediaPipe para alimentação robusta em loop
-                if (mediaPipeCamera) {
-                    mediaPipeCamera.stop();
-                }
-
-                mediaPipeCamera = new Camera(videoElement, {
-                    onFrame: async () => {
-                        if (videoElement && videoElement.readyState >= 2) {
-                            await handDetector.send({ image: videoElement });
-                        }
-                    },
-                    width: 640,
-                    height: 480
-                });
-
-                mediaPipeCamera.start();
-
-            } catch (err) {
-                logError("Falha ao iniciar MediaPipe Hands: " + err.message);
-            }
-        }
-
-        function onHandResults(results) {
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                updateStatus("Mão detectada!", "ok");
-                const landmarks = results.multiHandLandmarks[0];
-
-                // Atualizar posição das 21 articulações
-                for (let i = 0; i < landmarks.length; i++) {
-                    const lm = landmarks[i];
-
-                    // Mapeamento de coordenadas 2D do vídeo para o espaço 3D da cena
-                    const x = (lm.x - 0.5) * -3.6;
-                    const y = -(lm.y - 0.5) * 2.4;
-                    const z = -lm.z * 3 - 1.5;
-
-                    handJoints3D[i].position.set(x, y, z);
-                    handJoints3D[i].visible = true;
-                }
-
-                // Atualizar ossos/conexões entre as articulações
-                HAND_CONNECTIONS.forEach((connection, index) => {
-                    const startJoint = handJoints3D[connection[0]];
-                    const endJoint = handJoints3D[connection[1]];
-                    const bone = handBones3D[index];
-
-                    if (startJoint.visible && endJoint.visible) {
-                        const startPos = startJoint.position;
-                        const endPos = endJoint.position;
-
-                        const distance = startPos.distanceTo(endPos);
-                        bone.scale.set(1, distance, 1);
-
-                        // Posicionar o osso no ponto médio
-                        bone.position.copy(startPos).add(endPos).multiplyScalar(0.5);
-
-                        // Orientar o osso na direção da articulação final
-                        const orientation = new THREE.Matrix4();
-                        orientation.lookAt(startPos, endPos, new THREE.Vector3(0, 1, 0));
-                        bone.rotation.setFromRotationMatrix(orientation);
-                        bone.rotateX(Math.PI / 2); // Alinhar cilindro com a direção
-
-                        bone.visible = true;
-                    } else {
-                        bone.visible = false;
-                    }
-                });
-
-                // Checar toque com a ponta do indicador (Landmark 8)
-                if (handJoints3D[8]) {
-                    checkHandInteractions(handJoints3D[8].position);
-                }
-            } else {
-                updateStatus("Procurando mãos...", "loading");
-                handJoints3D.forEach(mesh => mesh.visible = false);
-                handBones3D.forEach(mesh => mesh.visible = false);
-            }
-        }
-
-        function checkHandInteractions(handPos) {
-            interactiveObjects.forEach(obj => {
-                const dist = handPos.distanceTo(obj.position);
-                if (dist < 0.3) {
-                    obj.rotation.x += 0.08;
-                    obj.rotation.y += 0.08;
-                    obj.scale.set(1.3, 1.3, 1.3);
-                } else {
-                    obj.scale.set(1.0, 1.0, 1.0);
-                }
-            });
-        }
-
-        // --- RENDER LOOP ---
-        function animate(time) {
-            requestAnimationFrame(animate);
-
-            // Animar objetos
-            interactiveObjects.forEach((obj, idx) => {
-                obj.rotation.x += obj.userData.rotSpeedX;
-                obj.rotation.y += obj.userData.rotSpeedY;
-                obj.position.y = obj.userData.initialY + Math.sin(time * 0.002 + idx) * 0.08;
-            });
-
-            if (isVRMode) {
-                rendererLeft.render(scene, cameraLeft);
-                rendererRight.render(scene, cameraRight);
-            } else {
-                rendererLeft.render(scene, cameraLeft);
-            }
-        }
-
-        function onWindowResize() {
-            const width = window.innerWidth;
-            const height = window.innerHeight;
-
-            if (isVRMode) {
-                rendererLeft.setSize(width / 2, height);
-                rendererRight.setSize(width / 2, height);
-                cameraLeft.aspect = (width / 2) / height;
-                cameraRight.aspect = (width / 2) / height;
-            } else {
-                rendererLeft.setSize(width, height);
-                cameraLeft.aspect = width / height;
-            }
-
-            cameraLeft.updateProjectionMatrix();
-            cameraRight.updateProjectionMatrix();
-        }
-
-        function toggleVRMode() {
-            isVRMode = !isVRMode;
-            if (isVRMode) {
-                container.classList.add('split-vr');
-                rightEye.style.display = 'block';
-            } else {
-                container.classList.remove('split-vr');
-                rightEye.style.display = 'none';
-            }
-            onWindowResize();
-        }
-
-        function toggleFullscreen() {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => logError("Fullscreen negado: " + err.message));
-            } else if (document.exitFullscreen) {
-                document.exitFullscreen();
-            }
-        }
-
-        // --- EVENTOS ---
-        btnStart.addEventListener('click', async () => {
-            if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-                logError("Atenção: A câmera exige protocolo seguro (HTTPS) na maioria dos celulares.");
-            }
-
-            startModal.classList.add('hidden');
-            
-            initThreeJS();
-            await startCamera("environment");
-            initHandTracking();
-            
-            if (!isInitialized) {
-                isInitialized = true;
-                animate(0);
-            }
+  </div>
+
+  <div id="msg-overlay"></div>
+
+  <script>
+    // --- VARIÁVEIS GLOBAIS ---
+    let score = 0;
+    let isVRMode = false;
+    let currentFacingMode = "environment"; // Prioriza câmera traseira
+    let videoElement, canvasElement, renderer, scene, camera;
+    let handsDetector, cameraUtils;
+
+    // Elementos 3D das mãos (21 articulações + conexões)
+    const handJoints = [];
+    const handBones = [];
+    const HAND_CONNECTIONS = [
+      [0,1],[1,2],[2,3],[3,4],        // Polegar
+      [0,5],[5,6],[6,7],[7,8],        // Indicador
+      [5,9],[9,10],[10,11],[11,12],   // Médio
+      [9,13],[13,14],[14,15],[15,16], // Anelar
+      [13,17],[17,18],[18,19],[19,20],[0,17] // Mínimo & Palma
+    ];
+
+    // Itens Coletáveis
+    const collectibles = [];
+    const NUM_COLLECTIBLES = 3;
+
+    // --- INICIALIZAÇÃO DA CENA 3D (THREE.JS) ---
+    function init3D() {
+      canvasElement = document.getElementById('canvas-3d');
+      scene = new THREE.Scene();
+
+      camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 0, 0);
+
+      renderer = new THREE.WebGLRenderer({
+        canvas: canvasElement,
+        alpha: true,
+        antialias: true
+      });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      // Iluminação
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+      dirLight.position.set(0, 10, 10);
+      scene.add(dirLight);
+
+      // Criar o esqueleto 3D da mão
+      const jointGeo = new THREE.SphereGeometry(0.12, 16, 16);
+      const indexJointGeo = new THREE.SphereGeometry(0.2, 16, 16);
+      const jointMat = new THREE.MeshStandardMaterial({ color: 0x00e5ff, roughness: 0.2, metalness: 0.8 });
+      const indexMat = new THREE.MeshStandardMaterial({ color: 0xff0055, emissive: 0xff0055, emissiveIntensity: 0.5 });
+
+      for (let i = 0; i < 21; i++) {
+        const mesh = new THREE.Mesh(i === 8 ? indexJointGeo : jointGeo, i === 8 ? indexMat : jointMat);
+        mesh.visible = false;
+        scene.add(mesh);
+        handJoints.push(mesh);
+      }
+
+      const boneMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.6 });
+      for (let i = 0; i < HAND_CONNECTIONS.length; i++) {
+        const boneGeo = new THREE.CylinderGeometry(0.04, 0.04, 1);
+        const mesh = new THREE.Mesh(boneGeo, boneMat);
+        mesh.visible = false;
+        scene.add(mesh);
+        handBones.push(mesh);
+      }
+
+      // Criar Itens Coletáveis (Moedas Douradas)
+      spawnCollectibles();
+
+      // Responsividade
+      window.addEventListener('resize', onWindowResize);
+    }
+
+    function spawnCollectibles() {
+      const coinGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.08, 24);
+      const coinMat = new THREE.MeshStandardMaterial({
+        color: 0xffd700,
+        metalness: 0.9,
+        roughness: 0.1,
+        emissive: 0xaa7700,
+        emissiveIntensity: 0.2
+      });
+
+      for (let i = 0; i < NUM_COLLECTIBLES; i++) {
+        const coin = new THREE.Mesh(coinGeo, coinMat);
+        coin.rotation.x = Math.PI / 2;
+        resetCollectiblePosition(coin);
+        scene.add(coin);
+        collectibles.push(coin);
+      }
+    }
+
+    function resetCollectiblePosition(mesh) {
+      mesh.position.x = (Math.random() - 0.5) * 6;
+      mesh.position.y = (Math.random() - 0.5) * 4;
+      mesh.position.z = -5 - Math.random() * 2;
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // --- INICIALIZAÇÃO DA CÂMERA E MEDIAPIPE ---
+    async function initCameraAndHands() {
+      videoElement = document.getElementById('webcam');
+      const statusBadge = document.getElementById('hand-status');
+
+      // Configuração do MediaPipe Hands
+      handsDetector = new Hands({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+      });
+
+      handsDetector.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.6,
+        minTrackingConfidence: 0.6
+      });
+
+      handsDetector.onResults(onHandResults);
+
+      // Iniciar a Câmera
+      await startCamera(currentFacingMode);
+    }
+
+    async function startCamera(facing) {
+      if (cameraUtils) {
+        await cameraUtils.stop();
+      }
+
+      try {
+        cameraUtils = new Camera(videoElement, {
+          onFrame: async () => {
+            await handsDetector.send({ image: videoElement });
+          },
+          width: 640,
+          height: 480,
+          facingMode: facing
         });
+        await cameraUtils.start();
+        document.getElementById('hand-status').innerText = "Procurando Mãos...";
+      } catch (err) {
+        showError("Erro ao acessar a câmera: " + err.message);
+      }
+    }
 
-        btnSwitchCamera.addEventListener('click', switchCamera);
-        btnToggleVR.addEventListener('click', toggleVRMode);
-        btnFullscreen.addEventListener('click', toggleFullscreen);
-    </script>
+    // --- PROCESSAMENTO DAS MÃOS & COLISÃO ---
+    function onHandResults(results) {
+      const statusBadge = document.getElementById('hand-status');
+
+      if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+        statusBadge.innerText = "Nenhuma Mão Detectada";
+        statusBadge.classList.remove('active');
+        hideHand();
+        return;
+      }
+
+      statusBadge.innerText = "Mão Detectada!";
+      statusBadge.classList.add('active');
+
+      const landmarks = results.multiHandLandmarks[0];
+
+      // Mapeamento correto das coordenadas (Sem espelhamento para câmera traseira)
+      landmarks.forEach((lm, index) => {
+        // Inversão do e/ou ajuste para alinhar X/Y com a câmera traseira
+        const x = (1 - lm.x - 0.5) * 8 * (camera.aspect);
+        const y = -(lm.y - 0.5) * 6;
+        const z = -lm.z * 10 - 4; // Ajuste de profundidade
+
+        handJoints[index].position.set(x, y, z);
+        handJoints[index].visible = true;
+      });
+
+      // Atualiza os ossos/conexões
+      HAND_CONNECTIONS.forEach((conn, index) => {
+        const p1 = handJoints[conn[0]].position;
+        const p2 = handJoints[conn[1]].position;
+
+        const bone = handBones[index];
+        bone.position.copy(p1).add(p2).multiplyScalar(0.5);
+        bone.lookAt(p2);
+        bone.rotateX(Math.PI / 2);
+        bone.scale.set(1, p1.distanceTo(p2), 1);
+        bone.visible = true;
+      });
+
+      // Checa colisão da ponta do indicador (Landmark 8) com as moedas
+      checkCollisions(handJoints[8].position);
+    }
+
+    function hideHand() {
+      handJoints.forEach(j => j.visible = false);
+      handBones.forEach(b => b.visible = false);
+    }
+
+    function checkCollisions(tipPos) {
+      collectibles.forEach(coin => {
+        if (coin.position.distanceTo(tipPos) < 0.6) {
+          // Incrementa pontuação ao encostar
+          score += 10;
+          document.getElementById('score-val').innerText = score;
+
+          // Efeito de coleta e reposicionamento
+          resetCollectiblePosition(coin);
+        }
+      });
+    }
+
+    // --- LOOP DE RENDERIZAÇÃO 3D ---
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // Rotaciona as moedas continuamente
+      collectibles.forEach(coin => {
+        coin.rotation.z += 0.03;
+      });
+
+      // Renderiza em tela cheia (ou dividida no modo VR)
+      if (isVRMode) {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        // Olho Esquerdo
+        renderer.setScissor(0, 0, width / 2, height);
+        renderer.setViewport(0, 0, width / 2, height);
+        renderer.setScissorTest(true);
+        renderer.render(scene, camera);
+
+        // Olho Direito
+        renderer.setScissor(width / 2, 0, width / 2, height);
+        renderer.setViewport(width / 2, 0, width / 2, height);
+        renderer.setScissorTest(true);
+        renderer.render(scene, camera);
+      } else {
+        renderer.setScissorTest(false);
+        renderer.render(scene, camera);
+      }
+    }
+
+    function showError(msg) {
+      const box = document.getElementById('msg-overlay');
+      box.innerText = msg;
+      box.style.display = 'block';
+      setTimeout(() => { box.style.display = 'none'; }, 5000);
+    }
+
+    // --- INTERAÇÕES & EVENTOS ---
+    document.getElementById('btn-switch-cam').addEventListener('click', () => {
+      currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
+      startCamera(currentFacingMode);
+    });
+
+    document.getElementById('btn-toggle-vr').addEventListener('click', () => {
+      isVRMode = !isVRMode;
+      document.body.classList.toggle('vr-mode', isVRMode);
+      onWindowResize();
+    });
+
+    // --- INICIALIZAR TUDO ---
+    window.addEventListener('DOMContentLoaded', () => {
+      init3D();
+      initCameraAndHands();
+      animate();
+    });
+  </script>
 </body>
 </html>
