@@ -1,0 +1,428 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#071018">
+<title>AR Hand Strike</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#071018;color:white;font-family:system-ui,Arial,sans-serif}
+#video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover}
+#scene{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+#hud{position:fixed;inset:0;pointer-events:none}
+.top{display:flex;justify-content:space-between;gap:8px;padding:calc(env(safe-area-inset-top) + 12px) 12px 12px}
+.panel{background:#071018d9;border:1px solid #31e9c1;border-radius:12px;padding:9px 12px;font-size:12px;min-width:92px}
+.value{font-size:22px;font-weight:800;color:#49ffd4}
+#status{position:absolute;top:90px;left:12px;right:12px;text-align:center;font-size:12px;color:#d4fff5;text-shadow:0 2px 5px #000}
+#aim{position:absolute;width:30px;height:30px;transform:translate(-50%,-50%);border:2px solid #52ffcf;border-radius:50%;box-shadow:0 0 12px #00ffd0}
+#aim:before,#aim:after{content:"";position:absolute;background:#52ffcf}
+#aim:before{width:44px;height:1px;left:-9px;top:12px}
+#aim:after{width:1px;height:44px;left:12px;top:-9px}
+#aim.hit{border-color:#ff466b;box-shadow:0 0 18px #ff234c}
+#message{position:absolute;top:35%;left:0;right:0;text-align:center;font-size:23px;font-weight:900;color:#62ffdb;text-shadow:0 2px 8px #000}
+.bottom{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 14px);left:0;right:0;display:flex;justify-content:center;gap:10px;padding:10px}
+button{pointer-events:auto;border:1px solid #36f5ca;background:#092923eF;color:white;border-radius:13px;padding:13px 16px;font-weight:800}
+#fire{background:#8e1934ed;border-color:#ff6987}
+#overlay{position:fixed;inset:0;background:#061019f2;display:flex;align-items:center;justify-content:center;padding:24px;z-index:5}
+.card{width:100%;max-width:390px;text-align:center}
+h1{letter-spacing:3px;color:#48ffd1;margin-bottom:6px}
+p,small{line-height:1.5;color:#c4d5dc}
+#startBtn{width:100%;margin-top:14px;background:#087c66}
+#err{color:#ff9eae;font-size:13px;overflow-wrap:anywhere}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<video id="video" autoplay muted playsinline></video>
+<canvas id="scene"></canvas>
+
+<div id="hud">
+  <div class="top">
+    <div class="panel">AR HAND STRIKE<br><span id="ammo" class="value">30</span> munições</div>
+    <div class="panel">PONTUAÇÃO<br><span id="score" class="value">0</span></div>
+  </div>
+  <div id="status">Aguardando câmera</div>
+  <div id="aim" class="hidden"></div>
+  <div id="message">TOQUE EM INICIAR</div>
+  <div class="bottom">
+    <button id="reload">RECARREGAR</button>
+    <button id="fire">DISPARO MANUAL</button>
+    <button id="reset">REINICIAR</button>
+  </div>
+</div>
+
+<div id="overlay">
+ <div class="card">
+  <h1>AR HAND STRIKE</h1>
+  <p>FPS de realidade aumentada controlado pelas mãos.</p>
+  <p><small>Permita a câmera traseira. Mantenha a mão visível na imagem e junte polegar e indicador para disparar. Use apenas em local seguro.</small></p>
+  <button id="startBtn">ATIVAR CÂMERA E JOGAR</button>
+  <p id="err"></p>
+  <small>Necessita internet para carregar o motor 3D e o modelo de IA.</small>
+ </div>
+</div>
+
+<script type="module">
+import * as THREE from
+'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
+
+const $ = id => document.getElementById(id);
+const video = $('video');
+const canvas = $('scene');
+const aim = $('aim');
+const statusEl = $('status');
+const message = $('message');
+const overlay = $('overlay');
+
+let stream, handLandmarker, scene, camera, renderer;
+let targets = [];
+let score = 0, ammo = 30;
+let running = false, busy = false;
+let lastVideoTime = -1, pinching = false, lastShot = 0;
+let aimX = innerWidth / 2, aimY = innerHeight / 2;
+let aimVisible = false;
+let lastFrame = 0;
+
+const clock = new THREE.Clock();
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+
+function updateHUD(){
+  $('score').textContent = score;
+  $('ammo').textContent = ammo;
+}
+
+function resize(){
+  if(!camera || !renderer) return;
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
+}
+addEventListener('resize', resize);
+
+function makeEnemy(x,y,z){
+  const group = new THREE.Group();
+
+  const armor = new THREE.MeshStandardMaterial({
+    color:0x273747, metalness:.7, roughness:.3
+  });
+  const red = new THREE.MeshStandardMaterial({
+    color:0xe42d50, emissive:0x4a0010, metalness:.3
+  });
+  const eyeMat = new THREE.MeshBasicMaterial({color:0x55ffe1});
+
+  function part(geo,mat,px,py,pz){
+    const mesh = new THREE.Mesh(geo,mat);
+    mesh.position.set(px,py,pz);
+    group.add(mesh);
+    return mesh;
+  }
+
+  part(new THREE.BoxGeometry(.62,.72,.36),red,0,0,0);
+  part(new THREE.SphereGeometry(.25,16,12),armor,0,.53,0);
+  part(new THREE.BoxGeometry(.12,.07,.035),eyeMat,-.10,.56,-.23);
+  part(new THREE.BoxGeometry(.12,.07,.035),eyeMat,.10,.56,-.23);
+  part(new THREE.BoxGeometry(.17,.43,.18),armor,-.39,-.12,0);
+  part(new THREE.BoxGeometry(.17,.43,.18),armor,.39,-.12,0);
+  part(new THREE.BoxGeometry(.19,.42,.2),armor,-.19,-.55,0);
+  part(new THREE.BoxGeometry(.19,.42,.2),armor,.19,-.55,0);
+
+  group.position.set(x,y,z);
+  group.userData.phase = Math.random()*6;
+  group.userData.alive = true;
+  scene.add(group);
+  targets.push(group);
+}
+
+function spawnWave(){
+  for(const t of targets) scene.remove(t);
+  targets = [];
+
+  for(let i=0;i<5;i++){
+    makeEnemy((Math.random()-.5)*4.4,
+              (Math.random()-.5)*1.8,
+              -4.5-Math.random()*3.5);
+  }
+  message.textContent = '5 ALVOS — ENCONTRE-OS';
+}
+
+function setup3D(){
+  scene = new THREE.Scene();
+
+  camera = new THREE.PerspectiveCamera(
+    70, innerWidth/innerHeight, .1, 60
+  );
+  camera.position.set(0,0,0);
+
+  renderer = new THREE.WebGLRenderer({
+    canvas, alpha:true, antialias:true
+  });
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1,1.5));
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.setClearColor(0x000000,0);
+
+  scene.add(new THREE.HemisphereLight(0xffffff,0x263044,2));
+  const light = new THREE.DirectionalLight(0xffffff,2);
+  light.position.set(2,5,4);
+  scene.add(light);
+
+  spawnWave();
+}
+
+function screenToNDC(x,y){
+  return new THREE.Vector2(
+    (x / innerWidth) * 2 - 1,
+    -(y / innerHeight) * 2 + 1
+  );
+}
+
+/*
+ * Converte as coordenadas da imagem do MediaPipe para a tela.
+ * Corrige o recorte produzido por object-fit: cover.
+ */
+function landmarkToScreen(lm){
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  if(!vw || !vh) return null;
+
+  const scale = Math.max(innerWidth/vw,innerHeight/vh);
+  const shownW = vw*scale;
+  const shownH = vh*scale;
+  const offsetX = (shownW-innerWidth)/2;
+  const offsetY = (shownH-innerHeight)/2;
+
+  return {
+    x: lm.x*shownW-offsetX,
+    y: lm.y*shownH-offsetY
+  };
+}
+
+function shoot(){
+  if(!running || ammo<=0){
+    if(running) message.textContent='SEM MUNIÇÃO';
+    return;
+  }
+
+  ammo--;
+  updateHUD();
+
+  ndc.copy(screenToNDC(aimX,aimY));
+  raycaster.setFromCamera(ndc,camera);
+
+  const hits = raycaster.intersectObjects(
+    targets.flatMap(t=>t.children),true
+  );
+
+  if(hits.length){
+    let obj = hits[0].object;
+    while(obj.parent && !targets.includes(obj)){
+      obj=obj.parent;
+    }
+
+    if(targets.includes(obj)){
+      scene.remove(obj);
+      targets=targets.filter(t=>t!==obj);
+      score+=100;
+      updateHUD();
+      aim.classList.add('hit');
+      message.textContent='ALVO ATINGIDO +100';
+
+      setTimeout(()=>aim.classList.remove('hit'),180);
+
+      if(targets.length===0){
+        message.textContent='FASE CONCLUÍDA!';
+        setTimeout(()=>{
+          if(running) spawnWave();
+        },1200);
+      }
+      return;
+    }
+  }
+  message.textContent='DISPARO';
+}
+
+/* MediaPipe: detecta a mão e reconhece a pinça entre os dedos 4 e 8. */
+async function initHands(){
+  const vision = await import(
+    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14'
+  );
+
+  const files = await vision.FilesetResolver.forVisionTasks(
+    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
+  );
+
+  const modelURL =
+    'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+
+  const options = {
+    baseOptions:{
+      modelAssetPath:modelURL,
+      delegate:'GPU'
+    },
+    runningMode:'VIDEO',
+    numHands:1,
+    minHandDetectionConfidence:.55,
+    minHandPresenceConfidence:.55,
+    minTrackingConfidence:.5
+  };
+
+  try{
+    handLandmarker = await vision.HandLandmarker.createFromOptions(files,options);
+  }catch(gpuError){
+    options.baseOptions.delegate='CPU';
+    handLandmarker = await vision.HandLandmarker.createFromOptions(files,options);
+  }
+}
+
+function processHands(now){
+  if(!handLandmarker || video.readyState<2) return;
+
+  if(video.currentTime!==lastVideoTime){
+    lastVideoTime=video.currentTime;
+
+    const result=handLandmarker.detectForVideo(video,now);
+    const hand=result.landmarks?.[0];
+
+    if(!hand){
+      aimVisible=false;
+      aim.classList.add('hidden');
+      pinching=false;
+      statusEl.textContent='Mostre sua mão à câmera';
+      return;
+    }
+
+    /*
+     * 8 = ponta do indicador.
+     * 4 = ponta do polegar.
+     */
+    const index=landmarkToScreen(hand[8]);
+    const thumb=landmarkToScreen(hand[4]);
+
+    if(!index || !thumb) return;
+
+    aimX=index.x;
+    aimY=index.y;
+    aimVisible=true;
+    aim.style.left=aimX+'px';
+    aim.style.top=aimY+'px';
+    aim.classList.remove('hidden');
+
+    const dx=(thumb.x-index.x)/innerWidth;
+    const dy=(thumb.y-index.y)/innerHeight;
+    const distance=Math.hypot(dx,dy);
+
+    // Limite ajustável para o gesto de pinça.
+    const isPinching=distance<0.045;
+
+    if(isPinching && !pinching && now-lastShot>350){
+      lastShot=now;
+      shoot();
+    }
+
+    pinching=isPinching;
+    statusEl.textContent=isPinching
+      ? 'PINÇA DETECTADA — DISPARO'
+      : 'Mão detectada — mire com o indicador';
+  }
+}
+
+function animate(now){
+  if(!running) return;
+  requestAnimationFrame(animate);
+
+  // Limita o processamento do modelo a aproximadamente 24 FPS.
+  if(now-lastFrame>40){
+    lastFrame=now;
+    try{
+      processHands(now);
+    }catch(e){
+      statusEl.textContent='Erro no rastreamento da mão';
+      console.error(e);
+    }
+  }
+
+  const t=clock.getElapsedTime();
+  for(const e of targets){
+    e.position.y += Math.sin(t*2+e.userData.phase)*.0015;
+    e.rotation.y = Math.sin(t+e.userData.phase)*.12;
+  }
+  renderer.render(scene,camera);
+}
+
+$('startBtn').onclick=async()=>{
+  if(busy) return;
+  busy=true;
+  $('startBtn').disabled=true;
+  $('err').textContent='Abrindo câmera e carregando IA...';
+
+  try{
+    if(!navigator.mediaDevices?.getUserMedia){
+      throw new Error('Abra o jogo por um endereço HTTPS no Safari.');
+    }
+
+    stream=await navigator.mediaDevices.getUserMedia({
+      audio:false,
+      video:{
+        facingMode:{ideal:'environment'},
+        width:{ideal:1280},
+        height:{ideal:720}
+      }
+    });
+
+    video.srcObject=stream;
+    await video.play();
+
+    statusEl.textContent='Carregando rastreamento de mãos...';
+    await initHands();
+
+    setup3D();
+    resize();
+
+    score=0;
+    ammo=30;
+    updateHUD();
+
+    running=true;
+    clock.start();
+    overlay.classList.add('hidden');
+    message.textContent='MIRE COM O INDICADOR';
+    requestAnimationFrame(animate);
+  }catch(e){
+    $('err').textContent='Não foi possível iniciar: '+e.message+
+      '. Confira HTTPS, permissões e conexão com a internet.';
+    if(stream){
+      stream.getTracks().forEach(t=>t.stop());
+      stream=null;
+    }
+    video.srcObject=null;
+  }finally{
+    busy=false;
+    $('startBtn').disabled=false;
+  }
+};
+
+$('fire').onclick=shoot;
+$('reload').onclick=()=>{
+  ammo=30;
+  updateHUD();
+  message.textContent='MUNIÇÃO RECARREGADA';
+};
+$('reset').onclick=()=>{
+  if(!running)return;
+  score=0;
+  ammo=30;
+  updateHUD();
+  spawnWave();
+};
+
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden && stream){
+    statusEl.textContent='Jogo pausado ao sair da tela';
+  }
+});
+</script>
+</body>
+</html>
