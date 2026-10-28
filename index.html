@@ -1,462 +1,527 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>VR Mobile - Rastreamento de Mãos & Coletáveis</title>
 
-  <!-- Three.js (Motor 3D) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  'use strict';
 
-  <!-- MediaPipe Hands & Camera Utils -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  // =====================================================
+  // CONFIGURAÇÕES
+  // =====================================================
+  const MAX_HANDS = 2;
+  const NUM_COLLECTIBLES = 3;
+  const CONNECTIONS = [
+    [0,1],[1,2],[2,3],[3,4],
+    [0,5],[5,6],[6,7],[7,8],
+    [5,9],[9,10],[10,11],[11,12],
+    [9,13],[13,14],[14,15],[15,16],
+    [13,17],[17,18],[18,19],[19,20],
+    [0,17]
+  ];
 
-  <!-- MediaPipe Hands SDK -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  let score = 0;
+  let isVRMode = false;
+  let facingMode = 'environment';
+  let video, renderer, scene, camera, detector, cameraUtils;
+  let cameraStarting = false;
+  let cameraRequestId = 0;
+  let lastFrameTime = 0;
 
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      user-select: none;
-      -webkit-user-select: none;
+  const handRigs = [];
+  const collectibles = [];
+
+  const statusElement = document.getElementById('hand-status');
+  const scoreElement = document.getElementById('score-val');
+  const errorElement = document.getElementById('msg-overlay');
+
+  // =====================================================
+  // CENA 3D
+  // =====================================================
+  function init3D() {
+    video = document.getElementById('webcam');
+
+    const canvas = document.getElementById('canvas-3d');
+
+    scene = new THREE.Scene();
+
+    camera = new THREE.PerspectiveCamera(
+      60,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+
+    camera.position.set(0, 0, 0);
+
+    renderer = new THREE.WebGLRenderer({
+      canvas,
+      alpha: true,
+      antialias: true,
+      powerPreference: 'high-performance'
+    });
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setScissorTest(false);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 1.1));
+
+    const light = new THREE.DirectionalLight(0xffffff, 1.3);
+    light.position.set(0, 5, 8);
+    scene.add(light);
+
+    // Cada mão recebe seu próprio esqueleto.
+    for (let h = 0; h < MAX_HANDS; h++) {
+      createHandRig(h);
     }
 
-    body, html {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background-color: #000;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      color: #fff;
+    createCollectibles();
+
+    window.addEventListener('resize', resize3D);
+  }
+
+  function createHandRig(handIndex) {
+    const joints = [];
+    const bones = [];
+
+    // Cores diferentes para distinguir as mãos.
+    const color = handIndex === 0 ? 0x00e5ff : 0xff9d00;
+
+    const jointMaterial = new THREE.MeshStandardMaterial({
+      color,
+      metalness: 0.55,
+      roughness: 0.25,
+      emissive: color,
+      emissiveIntensity: 0.12
+    });
+
+    const indexMaterial = new THREE.MeshStandardMaterial({
+      color: 0xff0055,
+      emissive: 0xff0055,
+      emissiveIntensity: 0.8,
+      roughness: 0.2
+    });
+
+    const jointGeometry = new THREE.SphereGeometry(0.065, 12, 10);
+    const indexGeometry = new THREE.SphereGeometry(0.105, 14, 12);
+
+    for (let i = 0; i < 21; i++) {
+      const joint = new THREE.Mesh(
+        i === 8 ? indexGeometry : jointGeometry,
+        i === 8 ? indexMaterial : jointMaterial
+      );
+
+      joint.visible = false;
+      scene.add(joint);
+      joints.push(joint);
     }
 
-    /* Elementos de Câmera e Canvas 3D */
-    #webcam {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      z-index: 1;
-      transform: scaleX(1); /* Sem espelhamento para câmera traseira */
+    const boneMaterial = new THREE.MeshStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: 0.15,
+      transparent: true,
+      opacity: 0.85
+    });
+
+    const boneGeometry = new THREE.CylinderGeometry(0.025, 0.025, 1, 8);
+
+    for (let i = 0; i < CONNECTIONS.length; i++) {
+      const bone = new THREE.Mesh(boneGeometry, boneMaterial);
+      bone.visible = false;
+      scene.add(bone);
+      bones.push(bone);
     }
 
-    #canvas-3d {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 2;
-      pointer-events: none;
+    handRigs.push({
+      joints,
+      bones,
+      visible: false,
+      lastSeen: 0
+    });
+  }
+
+  // =====================================================
+  // MOEDAS COLETÁVEIS
+  // =====================================================
+  function createCollectibles() {
+    const geometry = new THREE.CylinderGeometry(0.22, 0.22, 0.065, 24);
+
+    const material = new THREE.MeshStandardMaterial({
+      color: 0xffd700,
+      metalness: 0.9,
+      roughness: 0.18,
+      emissive: 0xaa7700,
+      emissiveIntensity: 0.3
+    });
+
+    for (let i = 0; i < NUM_COLLECTIBLES; i++) {
+      const coin = new THREE.Mesh(geometry, material);
+
+      coin.rotation.x = Math.PI / 2;
+      coin.userData.collected = false;
+
+      resetCollectible(coin);
+
+      scene.add(coin);
+      collectibles.push(coin);
+    }
+  }
+
+  function resetCollectible(coin) {
+    coin.position.set(
+      (Math.random() - 0.5) * 5,
+      (Math.random() - 0.5) * 3.5,
+      -4.5 - Math.random() * 2
+    );
+  }
+
+  // =====================================================
+  // CONVERSÃO DE COORDENADAS
+  // =====================================================
+  function landmarkToWorld(landmark) {
+    const depth = THREE.MathUtils.clamp(
+      -landmark.z * 2,
+      -0.5,
+      0.8
+    );
+
+    const z = -4.5 + depth;
+
+    // Converte as coordenadas normalizadas da câmera
+    // para coordenadas compatíveis com a perspectiva 3D.
+    const visibleHeight =
+      2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * Math.abs(z);
+
+    const visibleWidth = visibleHeight * camera.aspect;
+
+    let normalizedX = landmark.x - 0.5;
+
+    // A câmera frontal é espelhada visualmente.
+    if (facingMode === 'user') {
+      normalizedX = -normalizedX;
     }
 
-    /* Painel HUD/UI Overlay */
-    #ui-container {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 10;
-      pointer-events: none;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      padding: 16px;
+    return new THREE.Vector3(
+      normalizedX * visibleWidth,
+      (0.5 - landmark.y) * visibleHeight,
+      z
+    );
+  }
+
+  // =====================================================
+  // ATUALIZAÇÃO DE CADA ESQUELETO
+  // =====================================================
+  function updateHand(rig, landmarks) {
+    if (!landmarks || landmarks.length < 21) {
+      hideRig(rig);
+      return;
     }
 
-    .hud-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: rgba(0, 0, 0, 0.65);
-      backdrop-filter: blur(8px);
-      padding: 12px 18px;
-      border-radius: 14px;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      pointer-events: auto;
+    for (let i = 0; i < 21; i++) {
+      const position = landmarkToWorld(landmarks[i]);
+
+      rig.joints[i].position.copy(position);
+      rig.joints[i].visible = true;
     }
 
-    .score-badge {
-      font-size: 18px;
-      font-weight: 700;
-      color: #ffd700;
-      text-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
-    }
+    for (let i = 0; i < CONNECTIONS.length; i++) {
+      const [a, b] = CONNECTIONS[i];
 
-    .status-badge {
-      font-size: 13px;
-      padding: 4px 10px;
-      border-radius: 20px;
-      background: #333;
-      color: #aaa;
-      font-weight: 600;
-    }
+      const start = rig.joints[a].position;
+      const end = rig.joints[b].position;
 
-    .status-badge.active {
-      background: #2e7d32;
-      color: #fff;
-    }
+      const bone = rig.bones[i];
+      const direction = new THREE.Vector3().subVectors(end, start);
+      const length = direction.length();
 
-    /* Controles Inferiores */
-    .hud-controls {
-      display: flex;
-      gap: 10px;
-      justify-content: center;
-      pointer-events: auto;
-      margin-bottom: 10px;
-    }
-
-    .btn {
-      background: rgba(255, 255, 255, 0.2);
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      color: white;
-      padding: 12px 20px;
-      border-radius: 30px;
-      font-weight: 600;
-      font-size: 14px;
-      backdrop-filter: blur(10px);
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    .btn:active {
-      transform: scale(0.95);
-      background: rgba(255, 255, 255, 0.4);
-    }
-
-    /* Divisor Stereo (Modo VR Cardboard) */
-    #vr-divider {
-      position: absolute;
-      top: 0;
-      left: 50%;
-      width: 2px;
-      height: 100%;
-      background: #000;
-      z-index: 5;
-      display: none;
-      transform: translateX(-50%);
-    }
-
-    body.vr-mode #vr-divider {
-      display: block;
-    }
-
-    /* Mensagem de Erro/Aviso */
-    #msg-overlay {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(0,0,0,0.85);
-      padding: 20px;
-      border-radius: 12px;
-      text-align: center;
-      z-index: 20;
-      display: none;
-      max-width: 80%;
-    }
-  </style>
-</head>
-<body>
-
-  <!-- Elemento de Vídeo para Entrada da Câmera -->
-  <video id="webcam" autoplay playsinline muted></video>
-
-  <!-- Canvas 3D do Three.js -->
-  <canvas id="canvas-3d"></canvas>
-
-  <!-- Divisor do Modo VR -->
-  <div id="vr-divider"></div>
-
-  <!-- Interface HUD -->
-  <div id="ui-container">
-    <div class="hud-header">
-      <div class="score-badge">🪙 <span id="score-val">0</span></div>
-      <div id="hand-status" class="status-badge">Aguardando Câmera...</div>
-    </div>
-
-    <div class="hud-controls">
-      <button class="btn" id="btn-switch-cam">🔄 Inverter Câmera</button>
-      <button class="btn" id="btn-toggle-vr">🥽 Modo VR / AR</button>
-    </div>
-  </div>
-
-  <div id="msg-overlay"></div>
-
-  <script>
-    // --- VARIÁVEIS GLOBAIS ---
-    let score = 0;
-    let isVRMode = false;
-    let currentFacingMode = "environment"; // Prioriza câmera traseira
-    let videoElement, canvasElement, renderer, scene, camera;
-    let handsDetector, cameraUtils;
-
-    // Elementos 3D das mãos (21 articulações + conexões)
-    const handJoints = [];
-    const handBones = [];
-    const HAND_CONNECTIONS = [
-      [0,1],[1,2],[2,3],[3,4],        // Polegar
-      [0,5],[5,6],[6,7],[7,8],        // Indicador
-      [5,9],[9,10],[10,11],[11,12],   // Médio
-      [9,13],[13,14],[14,15],[15,16], // Anelar
-      [13,17],[17,18],[18,19],[19,20],[0,17] // Mínimo & Palma
-    ];
-
-    // Itens Coletáveis
-    const collectibles = [];
-    const NUM_COLLECTIBLES = 3;
-
-    // --- INICIALIZAÇÃO DA CENA 3D (THREE.JS) ---
-    function init3D() {
-      canvasElement = document.getElementById('canvas-3d');
-      scene = new THREE.Scene();
-
-      camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-      camera.position.set(0, 0, 0);
-
-      renderer = new THREE.WebGLRenderer({
-        canvas: canvasElement,
-        alpha: true,
-        antialias: true
-      });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-      // Iluminação
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-      scene.add(ambientLight);
-
-      const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-      dirLight.position.set(0, 10, 10);
-      scene.add(dirLight);
-
-      // Criar o esqueleto 3D da mão
-      const jointGeo = new THREE.SphereGeometry(0.12, 16, 16);
-      const indexJointGeo = new THREE.SphereGeometry(0.2, 16, 16);
-      const jointMat = new THREE.MeshStandardMaterial({ color: 0x00e5ff, roughness: 0.2, metalness: 0.8 });
-      const indexMat = new THREE.MeshStandardMaterial({ color: 0xff0055, emissive: 0xff0055, emissiveIntensity: 0.5 });
-
-      for (let i = 0; i < 21; i++) {
-        const mesh = new THREE.Mesh(i === 8 ? indexJointGeo : jointGeo, i === 8 ? indexMat : jointMat);
-        mesh.visible = false;
-        scene.add(mesh);
-        handJoints.push(mesh);
+      if (length < 0.001) {
+        bone.visible = false;
+        continue;
       }
 
-      const boneMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.6 });
-      for (let i = 0; i < HAND_CONNECTIONS.length; i++) {
-        const boneGeo = new THREE.CylinderGeometry(0.04, 0.04, 1);
-        const mesh = new THREE.Mesh(boneGeo, boneMat);
-        mesh.visible = false;
-        scene.add(mesh);
-        handBones.push(mesh);
-      }
+      bone.position.copy(start).add(end).multiplyScalar(0.5);
 
-      // Criar Itens Coletáveis (Moedas Douradas)
-      spawnCollectibles();
+      // O cilindro do Three.js aponta inicialmente para o eixo Y.
+      bone.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
 
-      // Responsividade
-      window.addEventListener('resize', onWindowResize);
+      bone.scale.set(1, length, 1);
+      bone.visible = true;
     }
 
-    function spawnCollectibles() {
-      const coinGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.08, 24);
-      const coinMat = new THREE.MeshStandardMaterial({
-        color: 0xffd700,
-        metalness: 0.9,
-        roughness: 0.1,
-        emissive: 0xaa7700,
-        emissiveIntensity: 0.2
+    rig.visible = true;
+    rig.lastSeen = performance.now();
+
+    // A ponta do indicador de cada mão coleta moedas.
+    checkCollisions(rig.joints[8].position);
+  }
+
+  function hideRig(rig) {
+    rig.visible = false;
+
+    rig.joints.forEach(joint => {
+      joint.visible = false;
+    });
+
+    rig.bones.forEach(bone => {
+      bone.visible = false;
+    });
+  }
+
+  function hideAllHands() {
+    handRigs.forEach(hideRig);
+  }
+
+  // =====================================================
+  // RESULTADOS DO MEDIAPIPE
+  // =====================================================
+  function onHandResults(results) {
+    const allLandmarks = results.multiHandLandmarks || [];
+    const count = Math.min(allLandmarks.length, MAX_HANDS);
+
+    // Atualiza cada mão detectada.
+    for (let i = 0; i < count; i++) {
+      updateHand(handRigs[i], allLandmarks[i]);
+    }
+
+    // Esconde os esqueletos que não receberam landmarks.
+    for (let i = count; i < MAX_HANDS; i++) {
+      hideRig(handRigs[i]);
+    }
+
+    statusElement.classList.toggle('active', count > 0);
+
+    if (count === 0) {
+      statusElement.textContent = 'Nenhuma mão detectada';
+    } else if (count === 1) {
+      statusElement.textContent = '1 mão detectada';
+    } else {
+      statusElement.textContent = '2 mãos detectadas';
+    }
+
+    statusElement.title = count + ' de ' + MAX_HANDS + ' mãos rastreadas';
+  }
+
+  // =====================================================
+  // COLISÕES E PONTUAÇÃO
+  // =====================================================
+  function checkCollisions(tipPosition) {
+    for (const coin of collectibles) {
+      if (coin.userData.collected) continue;
+
+      if (coin.position.distanceTo(tipPosition) < 0.42) {
+        coin.userData.collected = true;
+
+        score += 10;
+        scoreElement.textContent = score;
+
+        // Reposiciona imediatamente para evitar pontuação repetida.
+        resetCollectible(coin);
+        coin.userData.collected = false;
+      }
+    }
+  }
+
+  // =====================================================
+  // CÂMERA E MEDIAPIPE
+  // =====================================================
+  async function initCameraAndHands() {
+    statusElement.textContent = 'Inicializando rastreamento...';
+
+    try {
+      detector = new Hands({
+        locateFile: file =>
+          'https://cdn.jsdelivr.net/npm/@mediapipe/hands/' + file
       });
 
-      for (let i = 0; i < NUM_COLLECTIBLES; i++) {
-        const coin = new THREE.Mesh(coinGeo, coinMat);
-        coin.rotation.x = Math.PI / 2;
-        resetCollectiblePosition(coin);
-        scene.add(coin);
-        collectibles.push(coin);
-      }
-    }
-
-    function resetCollectiblePosition(mesh) {
-      mesh.position.x = (Math.random() - 0.5) * 6;
-      mesh.position.y = (Math.random() - 0.5) * 4;
-      mesh.position.z = -5 - Math.random() * 2;
-    }
-
-    function onWindowResize() {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    }
-
-    // --- INICIALIZAÇÃO DA CÂMERA E MEDIAPIPE ---
-    async function initCameraAndHands() {
-      videoElement = document.getElementById('webcam');
-      const statusBadge = document.getElementById('hand-status');
-
-      // Configuração do MediaPipe Hands
-      handsDetector = new Hands({
-        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-      });
-
-      handsDetector.setOptions({
-        maxNumHands: 1,
+      detector.setOptions({
+        maxNumHands: MAX_HANDS,
         modelComplexity: 1,
         minDetectionConfidence: 0.6,
         minTrackingConfidence: 0.6
       });
 
-      handsDetector.onResults(onHandResults);
+      detector.onResults(onHandResults);
 
-      // Iniciar a Câmera
-      await startCamera(currentFacingMode);
+      await startCamera(facingMode);
+    } catch (error) {
+      showError('Não foi possível iniciar o rastreamento: ' + error.message);
+      statusElement.textContent = 'Erro na inicialização';
     }
+  }
 
-    async function startCamera(facing) {
-      if (cameraUtils) {
-        await cameraUtils.stop();
-      }
-
+  async function stopCamera() {
+    if (cameraUtils) {
       try {
-        cameraUtils = new Camera(videoElement, {
-          onFrame: async () => {
-            await handsDetector.send({ image: videoElement });
-          },
-          width: 640,
-          height: 480,
-          facingMode: facing
-        });
-        await cameraUtils.start();
-        document.getElementById('hand-status').innerText = "Procurando Mãos...";
-      } catch (err) {
-        showError("Erro ao acessar a câmera: " + err.message);
-      }
-    }
-
-    // --- PROCESSAMENTO DAS MÃOS & COLISÃO ---
-    function onHandResults(results) {
-      const statusBadge = document.getElementById('hand-status');
-
-      if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
-        statusBadge.innerText = "Nenhuma Mão Detectada";
-        statusBadge.classList.remove('active');
-        hideHand();
-        return;
+        cameraUtils.stop();
+      } catch (error) {
+        console.warn('Erro ao parar a câmera:', error);
       }
 
-      statusBadge.innerText = "Mão Detectada!";
-      statusBadge.classList.add('active');
-
-      const landmarks = results.multiHandLandmarks[0];
-
-      // Mapeamento correto das coordenadas (Sem espelhamento para câmera traseira)
-      landmarks.forEach((lm, index) => {
-        // Inversão do e/ou ajuste para alinhar X/Y com a câmera traseira
-        const x = (1 - lm.x - 0.5) * 8 * (camera.aspect);
-        const y = -(lm.y - 0.5) * 6;
-        const z = -lm.z * 10 - 4; // Ajuste de profundidade
-
-        handJoints[index].position.set(x, y, z);
-        handJoints[index].visible = true;
-      });
-
-      // Atualiza os ossos/conexões
-      HAND_CONNECTIONS.forEach((conn, index) => {
-        const p1 = handJoints[conn[0]].position;
-        const p2 = handJoints[conn[1]].position;
-
-        const bone = handBones[index];
-        bone.position.copy(p1).add(p2).multiplyScalar(0.5);
-        bone.lookAt(p2);
-        bone.rotateX(Math.PI / 2);
-        bone.scale.set(1, p1.distanceTo(p2), 1);
-        bone.visible = true;
-      });
-
-      // Checa colisão da ponta do indicador (Landmark 8) com as moedas
-      checkCollisions(handJoints[8].position);
+      cameraUtils = null;
     }
 
-    function hideHand() {
-      handJoints.forEach(j => j.visible = false);
-      handBones.forEach(b => b.visible = false);
+    // Libera também a câmera se o navegador mantiver a stream ativa.
+    if (video && video.srcObject) {
+      video.srcObject.getTracks().forEach(track => track.stop());
+      video.srcObject = null;
     }
 
-    function checkCollisions(tipPos) {
-      collectibles.forEach(coin => {
-        if (coin.position.distanceTo(tipPos) < 0.6) {
-          // Incrementa pontuação ao encostar
-          score += 10;
-          document.getElementById('score-val').innerText = score;
+    hideAllHands();
+  }
 
-          // Efeito de coleta e reposicionamento
-          resetCollectiblePosition(coin);
-        }
-      });
-    }
-
-    // --- LOOP DE RENDERIZAÇÃO 3D ---
-    function animate() {
-      requestAnimationFrame(animate);
-
-      // Rotaciona as moedas continuamente
-      collectibles.forEach(coin => {
-        coin.rotation.z += 0.03;
-      });
-
-      // Renderiza em tela cheia (ou dividida no modo VR)
-      if (isVRMode) {
-        const width = window.innerWidth;
-        const height = window.innerHeight;
-
-        // Olho Esquerdo
-        renderer.setScissor(0, 0, width / 2, height);
-        renderer.setViewport(0, 0, width / 2, height);
-        renderer.setScissorTest(true);
-        renderer.render(scene, camera);
-
-        // Olho Direito
-        renderer.setScissor(width / 2, 0, width / 2, height);
-        renderer.setViewport(width / 2, 0, width / 2, height);
-        renderer.setScissorTest(true);
-        renderer.render(scene, camera);
-      } else {
-        renderer.setScissorTest(false);
-        renderer.render(scene, camera);
+  async function startCamera(facing) {
+    if (!detector || cameraStarting) {
+      if (cameraStarting) {
+        showError('Aguarde a inicialização atual da câmera.');
       }
+      return;
     }
 
-    function showError(msg) {
-      const box = document.getElementById('msg-overlay');
-      box.innerText = msg;
-      box.style.display = 'block';
-      setTimeout(() => { box.style.display = 'none'; }, 5000);
+    cameraStarting = true;
+    const requestId = ++cameraRequestId;
+
+    try {
+      await stopCamera();
+
+      facingMode = facing;
+
+      video.style.transform =
+        facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
+
+      statusElement.textContent = 'Abrindo câmera...';
+
+      if (requestId !== cameraRequestId) return;
+
+      cameraUtils = new Camera(video, {
+        onFrame: async () => {
+          if (!detector || !video.videoWidth || requestId !== cameraRequestId) {
+            return;
+          }
+
+          // Evita enviar vários frames simultâneos ao modelo.
+          const now = performance.now();
+
+          if (now - lastFrameTime < 33) return;
+          lastFrameTime = now;
+
+          try {
+            await detector.send({ image: video });
+          } catch (error) {
+            console.warn('Erro no processamento das mãos:', error);
+          }
+        },
+        width: 640,
+        height: 480,
+        facingMode: facingMode
+      });
+
+      await cameraUtils.start();
+
+      if (requestId === cameraRequestId) {
+        statusElement.textContent = 'Câmera ativa — procurando mãos';
+      }
+    } catch (error) {
+      if (requestId === cameraRequestId) {
+        showError(
+          'Não foi possível acessar a câmera. Verifique as permissões e use HTTPS. ' +
+          (error.message || '')
+        );
+
+        statusElement.textContent = 'Câmera indisponível';
+      }
+    } finally {
+      cameraStarting = false;
     }
+  }
 
-    // --- INTERAÇÕES & EVENTOS ---
-    document.getElementById('btn-switch-cam').addEventListener('click', () => {
-      currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
-      startCamera(currentFacingMode);
+  function showError(message) {
+    errorElement.textContent = message;
+    errorElement.style.display = 'block';
+
+    setTimeout(() => {
+      errorElement.style.display = 'none';
+    }, 5000);
+  }
+
+  // =====================================================
+  // MODO VR E REDIMENSIONAMENTO
+  // =====================================================
+  function resize3D() {
+    if (!renderer || !camera) return;
+
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+
+    const time = performance.now() * 0.001;
+
+    collectibles.forEach((coin, index) => {
+      coin.rotation.y += 0.025;
+      coin.rotation.z += 0.01;
+      coin.position.y += Math.sin(time * 2 + index) * 0.0015;
     });
 
-    document.getElementById('btn-toggle-vr').addEventListener('click', () => {
-      isVRMode = !isVRMode;
-      document.body.classList.toggle('vr-mode', isVRMode);
-      onWindowResize();
-    });
+    const width = window.innerWidth;
+    const height = window.innerHeight;
 
-    // --- INICIALIZAR TUDO ---
-    window.addEventListener('DOMContentLoaded', () => {
-      init3D();
-      initCameraAndHands();
-      animate();
-    });
-  </script>
-</body>
-</html>
+    if (isVRMode) {
+      const halfWidth = Math.floor(width / 2);
+
+      renderer.setScissorTest(true);
+
+      renderer.setViewport(0, 0, halfWidth, height);
+      renderer.setScissor(0, 0, halfWidth, height);
+      renderer.render(scene, camera);
+
+      renderer.setViewport(halfWidth, 0, width - halfWidth, height);
+      renderer.setScissor(halfWidth, 0, width - halfWidth, height);
+      renderer.render(scene, camera);
+
+      renderer.setScissorTest(false);
+    } else {
+      renderer.setViewport(0, 0, width, height);
+      renderer.render(scene, camera);
+    }
+  }
+
+  // =====================================================
+  // CONTROLES
+  // =====================================================
+  document.getElementById('btn-switch-cam').addEventListener('click', async () => {
+    if (cameraStarting) return;
+
+    const nextFacing =
+      facingMode === 'environment' ? 'user' : 'environment';
+
+    await startCamera(nextFacing);
+  });
+
+  document.getElementById('btn-toggle-vr').addEventListener('click', () => {
+    isVRMode = !isVRMode;
+    document.body.classList.toggle('vr-mode', isVRMode);
+    resize3D();
+  });
+
+  // =====================================================
+  // INICIALIZAÇÃO
+  // =====================================================
+  async function init() {
+    init3D();
+    animate();
+    await initCameraAndHands();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init, { once: true });
+  } else {
+    init();
+  }
+})();
+</script>
